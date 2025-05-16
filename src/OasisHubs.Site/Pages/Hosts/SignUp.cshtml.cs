@@ -47,7 +47,7 @@ public class HostSignUpModel : PageModel {
       var alcOptions = new AccountLinkCreateOptions {
          Account = currentUser.StripeAccountId,
          RefreshUrl = $"{basePageUri}hosts/refresh",
-         ReturnUrl = $"{basePageUri}/hosts/complete",
+         ReturnUrl = $"{basePageUri}hosts/complete",
          Type = "account_onboarding",
          Collect = "eventually_due"
       };
