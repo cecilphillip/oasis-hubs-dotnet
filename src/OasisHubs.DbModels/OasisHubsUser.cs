@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Identity;
 
-namespace OasisHubs.Site.Data;
+namespace OasisHubs.DbModels;
 
 public class OasisHubsUser : IdentityUser {
    public string StripeCustomerId { get; set; } = string.Empty;

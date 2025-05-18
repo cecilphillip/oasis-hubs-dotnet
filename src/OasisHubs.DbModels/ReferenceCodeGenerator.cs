@@ -1,7 +1,7 @@
 ﻿using System.Security.Cryptography;
 using System.Text;
 
-namespace OasisHubs.Site.Data;
+namespace OasisHubs.DbModels;
 /*
  * source: https://stackoverflow.com/questions/1344221/how-can-i-generate-random-alphanumeric-strings
  */

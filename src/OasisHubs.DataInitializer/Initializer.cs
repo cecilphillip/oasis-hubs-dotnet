@@ -1,89 +1,62 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using Bogus;
-using McMaster.Extensions.CommandLineUtils;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
-using OasisHubs.Site.Data;
+using OasisHubs.DbModels;
 using Stripe;
 using Stripe.TestHelpers;
-using CustomerService = Stripe.CustomerService;
 
-namespace OasisHubs.Site.Cli;
+namespace OasisHubs.DataInitializer;
 
-[Command(Name = "seed", Description = "Populates database with demo data")]
-public class SeedCommand : CommandBase {
-   private readonly UserManager<OasisHubsUser> _userManager;
-   private readonly IDbContextFactory<OasisHubsDbContext> _dbContextFactory;
-   private readonly ILogger<SeedCommand> _logger;
-
-   private readonly PriceService _priceService;
-   private readonly ProductService _productsService;
-   private readonly CustomerService _customerService;
-   private readonly AccountService _accountService;
-   private readonly TestClockService _testClockService;
-   private readonly Faker _faker;
-
+public class Initializer(
+//   UserManager<OasisHubsUser> userManager,
+   IServiceProvider serviceProvider,
+  // StripeClient stripeClient,
+   ILogger<Initializer> logger)
+   : BackgroundService {
+   private readonly Faker _faker = new("en_US");
    private const string _actMetaKey = "host.account.id";
    private const string _custMetaKey = "oasis.customer.id";
 
    private const string _placeHolderDescription =
       "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.";
 
-   public SeedCommand(UserManager<OasisHubsUser> userManager, IStripeClient stripeClient,
-      IDbContextFactory<OasisHubsDbContext> dbContextFactory, ILogger<SeedCommand> logger) {
-      this._userManager = userManager;
-      this._productsService = new ProductService(stripeClient);
-      this._priceService = new PriceService(stripeClient);
-      this._customerService = new CustomerService(stripeClient);
-      this._accountService = new AccountService(stripeClient);
-      this._testClockService = new TestClockService(stripeClient);
-      this._dbContextFactory = dbContextFactory;
-      this._logger = logger;
-      this._faker = new Faker("en_US");
+   protected override async Task ExecuteAsync(CancellationToken stoppingToken) {
+      logger.LogInformation("Seeding database ...");
+
+      using var scope = serviceProvider.CreateScope();
+      var dbContext = scope.ServiceProvider.GetRequiredService<OasisHubsDbContext>();
+      await dbContext.Database.EnsureCreatedAsync(stoppingToken);
+      
+      var stripeClient = scope.ServiceProvider.GetRequiredService<StripeClient>();
+      var userManager = scope.ServiceProvider.GetRequiredService<UserManager<OasisHubsUser>>();
+      
+      await CreateUsers(stripeClient, userManager);
+      await CreateHubTierProductsAsync(stripeClient);
+
+      logger.LogInformation("Seeding completed!");
    }
 
-   public async Task OnExecuteAsync() {
-      var proceed =
-         Prompt.GetYesNo("Proceed with seeding this database?",
-            defaultAnswer: false, promptColor: ConsoleColor.Blue);
+   //TODO: Change the names of thee users
+   private async Task CreateUsers(StripeClient stripeClient, UserManager<OasisHubsUser> userManager) {
+      logger.LogInformation("Creating users ...");
 
-      if (!proceed) return;
-
-      this._logger.LogInformation("Seeding database ...");
-
-      await using var context = await this._dbContextFactory.CreateDbContextAsync();
-      await context.Database.EnsureCreatedAsync();
-
-      await CreateUsers();
-      await CreateHubTierProductsAsync();
-
-      this._logger.LogInformation("Seeding completed!");
-   }
-
-   private async Task CreateUsers() {
-      this._logger.LogInformation("Creating users ...");
-
+      //TODO: add connect account to hosts
+      
       // Host User 1
-      await CreateUser("Cecil Phillip", "cecil@test.com", addExpressAccount: true);
+      await CreateUser("Cecil Phillip", "cecil@test.com", stripeClient, userManager); 
 
       // Host User 2
-      await CreateUser("Phil Host", "phil@test.com", addExpressAccount: true);
+      await CreateUser("James Moriarty", "james@test.com", stripeClient, userManager);
 
       // Customer 1
-      await CreateUser("Jonathan Smith", "jon@test.com");
+      await CreateUser("Dorian Gray", "dorian@test.com", stripeClient, userManager, addTestClock: true);
 
       // Customer 2
-      await CreateUser("Jaime Renter", "jaime@test.com");
-
-      // Customer 3
-      await CreateUser("Benjamin Westminster", "ben@test.com", addTestClock: true);
-
-      // Customer 4
-      await CreateUser("Chronos Titan", "chronos@test.com", addTestClock: true);
+      await CreateUser("H. G. Wells", "george@test.com",stripeClient, userManager, addTestClock: true);
    }
 
-   private async Task CreateUser(string name, string email, bool addExpressAccount = false,
-      bool addTestClock = false) {
+   private async Task CreateUser(string name, string email, StripeClient stripeClient, UserManager<OasisHubsUser> userManager, bool addExpressAccount = false, bool addTestClock = false) {
+      
       var ccOptions = new CustomerCreateOptions {
          Name = name,
          Email = email,
@@ -100,41 +73,39 @@ public class SeedCommand : CommandBase {
       };
 
       if (addTestClock) {
-         this._logger.LogInformation("Creating test clock ...");
+         logger.LogInformation("Creating test clock ...");
          var tcCreateOptions = new TestClockCreateOptions {
             Name = $"Subscription Clock ({name})", FrozenTime = DateTimeOffset.UtcNow.DateTime
          };
 
-         var newTestClock = await this._testClockService.CreateAsync(tcCreateOptions);
+         var newTestClock = await stripeClient.V1.TestHelpers.TestClocks.CreateAsync(tcCreateOptions);
          ccOptions.TestClock = newTestClock.Id;
-         this._logger.LogDebug(
-            "Created test clock ({TestClock}) attached to user ({Username}).", newTestClock.Id,
+         logger.LogDebug(
+            "Created test clock ({TestClock}) attached to user ({Username})", newTestClock.Id,
             ccOptions.Name);
       }
 
-      var newCustomer = await _customerService.CreateAsync(ccOptions);
+      var newCustomer = await stripeClient.V1.Customers.CreateAsync(ccOptions);
       var newUser = new OasisHubsUser {
-         UserName = ccOptions.Email,
-         Email = ccOptions.Email,
-         EmailConfirmed = true,
-         StripeCustomerId = newCustomer.Id
+         UserName = ccOptions.Email, Email = ccOptions.Email, EmailConfirmed = true, StripeCustomerId = newCustomer.Id
       };
 
-      await this._userManager.CreateAsync(newUser, "test");
+      await userManager.CreateAsync(newUser, "test");
 
       // add claim
-      await _userManager.AddClaimAsync(newUser, new Claim(ClaimsConstants.OASIS_USER_TYPE, "customer"));
-      this._logger.LogDebug("Created user {CustomerName}.", ccOptions.Name);
+      await userManager.AddClaimAsync(newUser, new Claim(ClaimsConstants.OASIS_USER_TYPE, "customer"));
+      logger.LogDebug("Created user {CustomerName}", ccOptions.Name);
 
       // update Stripe customer with oasis customer Id
       var cuOptions = new CustomerUpdateOptions {
          Metadata = new Dictionary<string, string> { [_custMetaKey] = newUser.Id }
       };
 
+      // Extract into its own method
       if (addExpressAccount) {
-         this._logger.LogInformation("Created express account ...");
+         logger.LogInformation("Created express account ...");
 
-         // create express account
+         // create an express account
          var companyName = this._faker.Company.CompanyName(0);
          var acOptions = new AccountCreateOptions {
             Country = "US",
@@ -170,34 +141,34 @@ public class SeedCommand : CommandBase {
             Metadata = new Dictionary<string, string> { ["owner.customer.id"] = newCustomer.Id }
          };
 
-         var newExpressAccount = await _accountService.CreateAsync(acOptions);
-         this._logger.LogDebug(
-            "Created express account for {ExpressBusinessName}.", acOptions.BusinessProfile.Name);
+         var newExpressAccount = await stripeClient.V1.Accounts.CreateAsync(acOptions);
+         logger.LogDebug(
+            "Created express account for {ExpressBusinessName}", acOptions.BusinessProfile.Name);
 
          // update user with express account Id
          newUser.StripeAccountId = newExpressAccount.Id;
-         await _userManager.UpdateAsync(newUser);
+         await userManager.UpdateAsync(newUser);
 
          // update Stripe customer with express
          cuOptions.Metadata[_actMetaKey] = newExpressAccount.Id;
          await CreateRentalHubsAsync(newUser.StripeAccountId, companyName);
       }
 
-      await _customerService.UpdateAsync(newCustomer.Id, cuOptions);
+      await stripeClient.V1.Customers.UpdateAsync(newCustomer.Id, cuOptions);
    }
 
    private async Task CreateRentalHubsAsync(string expressAccountId, string companyName) {
       if (string.IsNullOrEmpty(expressAccountId)) {
-         _logger.LogWarning("Cannot create hubs. Express account user not found!");
+         logger.LogWarning("Cannot create hubs. Express account user not found!");
          return;
       }
 
-      this._logger.LogInformation("Creating Hubs ...");
-      await using var context = await this._dbContextFactory.CreateDbContextAsync();
-      await context.Database.EnsureCreatedAsync();
-
+      logger.LogInformation("Creating Hubs ...");
+      using var scope = serviceProvider.CreateScope();
+      var context = scope.ServiceProvider.GetRequiredService<OasisHubsDbContext>();
+      
       // Hub Rental #1
-      await CreateHubAsync(context,
+       CreateHubAsync(context,
          new HubRental {
             Title = $"Two Room Condo by {companyName}",
             Description = _placeHolderDescription,
@@ -211,7 +182,7 @@ public class SeedCommand : CommandBase {
          });
 
       // Hub Rental #2
-      await CreateHubAsync(context,
+       CreateHubAsync(context,
          new HubRental {
             Title = $"Cute Ranch with huge yard by {companyName}",
             Description = _placeHolderDescription,
@@ -225,7 +196,7 @@ public class SeedCommand : CommandBase {
          });
 
       // Hub Rental #3
-      await CreateHubAsync(context,
+       CreateHubAsync(context,
          new HubRental {
             Title = $"The Canopy House by {companyName}",
             Description = _placeHolderDescription,
@@ -239,7 +210,7 @@ public class SeedCommand : CommandBase {
          });
 
       // Hub Rental #4
-      await CreateHubAsync(context,
+       CreateHubAsync(context,
          new HubRental {
             Title = $"Co-Working Desk by {companyName}",
             Description = _placeHolderDescription,
@@ -253,7 +224,7 @@ public class SeedCommand : CommandBase {
          });
 
       // Hub Rental #5
-      await CreateHubAsync(context,
+       CreateHubAsync(context,
          new HubRental {
             Title = $"Single Bedroom Apartment by {companyName}",
             Description = _placeHolderDescription,
@@ -265,65 +236,65 @@ public class SeedCommand : CommandBase {
             StripeAccountId = expressAccountId,
             ReferenceCode = ReferenceCodeGenerator.GetUniqueKey()
          });
-   }
-
-   private async Task CreateHubAsync(OasisHubsDbContext context, HubRental rental) {
-      if (rental == null) throw new ArgumentNullException(nameof(rental));
-      // Save product in the database
-      context.HubRentals.Add(rental);
+      
       await context.SaveChangesAsync();
-      this._logger.LogDebug("Add Hub rental record {RentalName} to database", rental.Title);
    }
 
-   private async Task CreateHubTierProductsAsync() {
-      this._logger.LogInformation("Creating product tiers ...");
+   private void CreateHubAsync(OasisHubsDbContext context, HubRental rental) {
+      
+      ArgumentNullException.ThrowIfNull(rental);
+      // Add a product in the database
+      context.HubRentals.Add(rental);
+      logger.LogDebug("Add Hub rental record {RentalName} to database", rental.Title);
+   }
+
+   private async Task CreateHubTierProductsAsync(StripeClient stripeClient) {
+      logger.LogInformation("Creating product tiers ...");
 
       await CreateHubTierAsync("Oasis Basic", "Oasis Basic Tier", 3500,
          new[] { "Cable Internet", "Shared Workspace", "Coffee and Tea" }, "basic_tier",
-         "oasis_basic_tier.png");
+         "oasis_basic_tier.png", stripeClient);
 
       await CreateHubTierAsync("Oasis Standard", "Oasis Standard Tier", 6000,
          new[] { "Standing Desk", "Private Office", "Snacks and Drinks" }, "standard_tier",
-         "oasis_standard_tier.png");
+         "oasis_standard_tier.png", stripeClient);
 
       await CreateHubTierAsync("Oasis Premium", "Oasis Premium Tier", 12000,
-         new[] {
-            "High Speed Fiber Optic Internet", "Whiteboards", "Private Team Workspace", "Catering"
-         }, "premium_tier", "oasis_premium_tier.png");
+         new[] { "High Speed Fiber Optic Internet", "Whiteboards", "Private Team Workspace", "Catering" },
+         "premium_tier", "oasis_premium_tier.png", stripeClient);
    }
 
    private async Task CreateHubTierAsync(string title, string description, long hourlyUnitPrice,
-      IEnumerable<string> features, string priceLookupPrefix, string imageFileName) {
+      IEnumerable<string> features, string priceLookupPrefix, string imageFileName, StripeClient stripeClient) {
+      
       // locate and upload image
-      var imagePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images",
-         imageFileName);
-
+      var imagePath = Path.Combine(Directory.GetCurrentDirectory(), "images", imageFileName);
       await using var stream = System.IO.File.OpenRead(imagePath);
       var fileCreateOptions =
          new FileCreateOptions { File = stream, Purpose = FilePurpose.BusinessLogo };
-      var fileService = new FileService();
-      var createdFile = await fileService.CreateAsync(fileCreateOptions);
-      this._logger.LogDebug("Uploading image file ({ImageFileName}) to stripe.", imageFileName);
 
-      // Create file link
+      var createdFile = await stripeClient.V1.Files.CreateAsync(fileCreateOptions);
+      logger.LogDebug("Uploading image file ({ImageFileName}) to stripe", imageFileName);
+
+      // Create a file link
       var fileLinkOptions = new FileLinkCreateOptions { File = createdFile.Id };
-      var service = new FileLinkService();
-      var fileLink = await service.CreateAsync(fileLinkOptions);
+      var fileLink = await stripeClient.V1.FileLinks.CreateAsync(fileLinkOptions);
 
-
-      // Create tier subscription in Stripe
-      this._logger.LogDebug("Creating product {ProductName} and attaching image file.", title);
+      // Create the subscription tier in Stripe
+      logger.LogDebug("Creating product {ProductName} and attaching image file", title);
       var prodCreateOptions = new ProductCreateOptions {
          Name = title,
          Description = description,
-         Images = new List<string> { fileLink.Url },
-         Features = features.Select(f => new ProductFeatureOptions { Name = f }).ToList(),
+         Images = [fileLink.Url],
+         MarketingFeatures = features.Select(f => new ProductMarketingFeatureOptions { Name = f }).ToList(),
          UnitLabel = "hour",
          Metadata =
-            new Dictionary<string, string> { ["hub.tier"] = "true", ["tier.image"] = imageFileName }
+            new Dictionary<string, string> { ["hub.tier"] = "true", ["tier.image"] = imageFileName },
+         
+         //TODO: investigate setting the default price here
       };
 
-      var newHubProduct = await this._productsService.CreateAsync(prodCreateOptions);
+      var newHubProduct = await stripeClient.V1.Products.CreateAsync(prodCreateOptions);
 
       // Create flat price in product
       var priceCreateOptions = new PriceCreateOptions {
@@ -332,31 +303,32 @@ public class SeedCommand : CommandBase {
          Currency = "usd",
          UnitAmount = hourlyUnitPrice,
          LookupKey = $"{priceLookupPrefix}_usd",
+         BillingScheme = "per_unit",
          Recurring = new PriceRecurringOptions { Interval = "month", UsageType = "licensed" }
       };
 
-      var newProductPrice = await this._priceService.CreateAsync(priceCreateOptions);
+      var newProductPrice = await stripeClient.V1.Prices.CreateAsync(priceCreateOptions);
 
       // Update default price
-      await this._productsService.UpdateAsync(newHubProduct.Id,
+      await stripeClient.V1.Products.UpdateAsync(newHubProduct.Id,
          new ProductUpdateOptions { DefaultPrice = newProductPrice.Id });
-      this._logger.LogDebug("Price ({PriceId}) created and set as default.", newProductPrice.Id);
+      logger.LogDebug("Price ({PriceId}) created and set as default", newProductPrice.Id);
 
-      // Create tiered pricing in product
+      // Create tiered pricing in a product
       priceCreateOptions = new PriceCreateOptions {
          Product = newHubProduct.Id,
          Nickname = newHubProduct.Name,
          LookupKey = $"{priceLookupPrefix}_usd_tiered",
          Currency = "usd",
          Tiers = new List<PriceTierOptions> {
-            new() { UnitAmount = 0, UpTo = 10 },
-            new() { UnitAmount = hourlyUnitPrice / 10, UpTo = PriceTierUpTo.Inf }
+            new() { UnitAmount = 0, UpTo = 10 }, new() { UnitAmount = hourlyUnitPrice / 10, UpTo = PriceTierUpTo.Inf }
          },
          Recurring = new PriceRecurringOptions { Interval = "month", UsageType = "metered" },
-         TiersMode = "graduated", BillingScheme = "tiered"
+         TiersMode = "graduated",
+         BillingScheme = "tiered"
       };
 
-      newProductPrice = await this._priceService.CreateAsync(priceCreateOptions);
-      this._logger.LogDebug("Metered price ({PriceId}) created ", newProductPrice.Id);
+      newProductPrice = await stripeClient.V1.Prices.CreateAsync(priceCreateOptions);
+      logger.LogDebug("Metered price ({PriceId}) created ", newProductPrice.Id);
    }
 }

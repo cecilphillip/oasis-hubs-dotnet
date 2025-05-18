@@ -1,4 +1,4 @@
-﻿namespace OasisHubs.Site.Data;
+﻿namespace OasisHubs.DbModels;
 
 public class Booking {
    public string Id { get; set; } = Guid.NewGuid().ToString("N");

@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
-namespace OasisHubs.Site.Data;
+namespace OasisHubs.DbModels;
 
 public class OasisHubsDbContext : IdentityDbContext<OasisHubsUser> {
    public OasisHubsDbContext(DbContextOptions<OasisHubsDbContext> options)

@@ -1,9 +1,0 @@
-{
-  "name": "oasis-hubs-dotnet",
-  "configureDotEnv": true,
-  "integrations": [
-    {
-      "name": "main"
-    }
-  ]
-}
