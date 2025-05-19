@@ -27,8 +27,7 @@ builder.Services.Configure<IdentityOptions>(options => {
 });
 
 builder.Services.AddStripe();
-builder.Services.AddSingleton<Initializer>();
-builder.Services.AddHostedService(sp => sp.GetRequiredService<Initializer>());
+builder.Services.AddHostedService<Initializer>();
 
 var app = builder.Build();
 
