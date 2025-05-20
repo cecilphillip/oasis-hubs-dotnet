@@ -1,28 +1,31 @@
+using System.Threading.Channels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.EntityFrameworkCore;
-using OasisHubs.Site.Data;
+using OasisHubs.DbModels;
+using OasisHubs.Defaults.Extensions;
 using Stripe;
 
 namespace OasisHubs.Site.Pages;
 
 [Authorize(Policy = "can_view_listings")]
 public class ListingDetailModel : PageModel {
-   private readonly IDbContextFactory<OasisHubsDbContext> _dbContextFactory;
+   private readonly OasisHubsDbContext _dbContext;
    private readonly UserManager<OasisHubsUser> _userManager;
-   private readonly IStripeClient _stripeClient;
+   private readonly StripeClient _stripeClient;
    private readonly ILogger<ListingDetailModel> _logger;
+   private readonly Channel<HubUsageReport> _usageReportChannel;
 
    [BindProperty(SupportsGet = true)] public string ReferenceCode { get; set; } = string.Empty;
    public HubRental? Rental { get; set; }
 
    public OasisHubsUser? OasisUser { get; set; }
 
-   public ListingDetailModel(IDbContextFactory<OasisHubsDbContext> dbContextFactory,
-      UserManager<OasisHubsUser> userManager, IStripeClient stripeClient, ILogger<ListingDetailModel> logger) {
-      this._dbContextFactory = dbContextFactory;
+   public ListingDetailModel(OasisHubsDbContext dbContext, Channel<HubUsageReport> usageReportChannel,
+      UserManager<OasisHubsUser> userManager, StripeClient stripeClient, ILogger<ListingDetailModel> logger) {
+      this._dbContext = dbContext;
+      this._usageReportChannel = usageReportChannel;
       this._userManager = userManager;
       this._stripeClient = stripeClient;
       this._logger = logger;
@@ -33,8 +36,8 @@ public class ListingDetailModel : PageModel {
 
       OasisUser = await _userManager.GetUserAsync(HttpContext.User);
 
-      await using var context = await this._dbContextFactory.CreateDbContextAsync();
-      Rental = context.HubRentals
+
+      Rental = this._dbContext.HubRentals
          .FirstOrDefault(h => h.IsActive && h.ReferenceCode.ToUpper() == ReferenceCode.ToUpper());
 
       if (Rental == null)
@@ -61,37 +64,20 @@ public class ListingDetailModel : PageModel {
          ReservedDateUtc = checkInDate.ToUniversalTime()
       };
 
-      await using var context = await this._dbContextFactory.CreateDbContextAsync();
-      context.Bookings.Add(booking);
-      await context.SaveChangesAsync();
+      this._dbContext.Bookings.Add(booking);
+      await this._dbContext.SaveChangesAsync();
 
       // retrieve subscription
-      var subscriptionService = new SubscriptionService(this._stripeClient);
-      var subscription = await subscriptionService.GetAsync(OasisUser.ActiveSubscriptionId);
+      var subscription = await this._stripeClient.V1.Subscriptions.GetAsync(OasisUser.ActiveSubscriptionId);
       if (subscription is not null) {
 
-         var subItem = subscription.Items.Data.Single(s => s.Price.LookupKey.EndsWith("_tiered"));
+         
+         await _usageReportChannel.Writer.WriteAsync(new HubUsageReport(OasisUser.StripeCustomerId, hours));
 
-            // report on usage
-            var ucOptions = new UsageRecordCreateOptions
-            {
-               Quantity = hours,
-               //Timestamp = DateTime.UtcNow,
-               Action = "increment"
-            };
-            var idempotencyKey = Guid.NewGuid().ToString("N");
-            var requestOptions = new RequestOptions
-            {
-               IdempotencyKey = idempotencyKey
-            };
-
-            var usageRecordService = new UsageRecordService(this._stripeClient);
-            await usageRecordService.CreateAsync(subItem.Id, ucOptions, requestOptions);
-
-            return RedirectToPage("/bookings");
+         return RedirectToPage("/bookings");
       }
 
-      this._logger.LogError("Subscription not found {SubscriptionId}",OasisUser.ActiveSubscriptionId);
+      this._logger.LogError("Subscription not found {SubscriptionId}", OasisUser.ActiveSubscriptionId);
       return Page();
    }
 }

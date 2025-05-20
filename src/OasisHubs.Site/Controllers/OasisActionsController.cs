@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using OasisHubs.Site.Data;
+using OasisHubs.DbModels;
 using OasisHubs.Site.Pages;
 using Stripe;
 
@@ -11,11 +11,11 @@ namespace OasisHubs.Site.Controllers;
 [Route("actions")]
 public class OasisActionsController : Controller {
    private readonly UserManager<OasisHubsUser> _userManager;
-   private readonly IStripeClient _stripeClient;
+   private readonly StripeClient _stripeClient;
    private readonly LinkGenerator _linkGenerator;
    private readonly ILogger<Pricing> _logger;
 
-   public OasisActionsController(UserManager<OasisHubsUser> userManager, IStripeClient stripeClient, LinkGenerator linkGenerator, ILogger<Pricing> logger) {
+   public OasisActionsController(UserManager<OasisHubsUser> userManager, StripeClient stripeClient, LinkGenerator linkGenerator, ILogger<Pricing> logger) {
       this._userManager = userManager;
       this._stripeClient = stripeClient;
       this._linkGenerator = linkGenerator;
@@ -50,8 +50,8 @@ public class OasisActionsController : Controller {
       if (user == null) {
          return RedirectToPage("/SignIn");
       }
-      var loginLinkService = new LoginLinkService();
-      var loginLink = await loginLinkService.CreateAsync(user.StripeAccountId);
+      
+      var loginLink = await  _stripeClient.V1.Accounts.LoginLinks  .  CreateAsync(user.StripeAccountId);
       _logger.LogInformation("Express Dashboard login created for Stripe account ({StripeAccountId})" , user.StripeAccountId);
       return Redirect(loginLink.Url);
    }

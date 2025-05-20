@@ -3,7 +3,8 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using OasisHubs.Site.Data;
+using OasisHubs.DbModels;
+using OasisHubs.Defaults.Extensions;
 using Stripe;
 
 namespace OasisHubs.Site.Pages;
@@ -11,7 +12,7 @@ namespace OasisHubs.Site.Pages;
 public class SignUpModel : PageModel {
    private readonly UserManager<OasisHubsUser> _userManager;
    private readonly SignInManager<OasisHubsUser> _signInManager;
-   private readonly IStripeClient _stripeClient;
+   private readonly StripeClient _stripeClient;
    private readonly ILogger<SignUpModel> _logger;
 
    [BindProperty] [Required] public string Name { get; set; } = string.Empty;
@@ -29,7 +30,7 @@ public class SignUpModel : PageModel {
    [TempData] public string ErrorMessage { get; set; } = string.Empty;
 
    public SignUpModel(UserManager<OasisHubsUser> userManager,
-      SignInManager<OasisHubsUser> signInManager, IStripeClient stripeClient,
+      SignInManager<OasisHubsUser> signInManager, StripeClient stripeClient,
       ILogger<SignUpModel> logger) {
       this._userManager = userManager;
       this._signInManager = signInManager;
@@ -37,13 +38,11 @@ public class SignUpModel : PageModel {
       this._logger = logger;
    }
 
-   public void OnGet() {
-   }
+   public void OnGet() { }
 
    public async Task<IActionResult> OnPostAsync() {
       if (ModelState.IsValid) {
-         var customerService = new CustomerService(_stripeClient);
-         var customers = await customerService.ListAsync(new() { Email = Email });
+         var customers = await this._stripeClient.V1.Customers.ListAsync(new() { Email = Email });
 
          if (customers.Any()) {
             ErrorMessage = "An account with that email already exists.";
@@ -52,17 +51,17 @@ public class SignUpModel : PageModel {
 
          var options = new CustomerCreateOptions { Name = Name, Email = Email };
 
-         var newCustomer = await customerService.CreateAsync(options);
+         var newCustomer = await this._stripeClient.V1.Customers.CreateAsync(options);
          var newUser = new OasisHubsUser {
-            UserName = Email,
-            Email = Email,
-            EmailConfirmed = true,
-            StripeCustomerId = newCustomer.Id
+            UserName = Email, Email = Email, EmailConfirmed = true, StripeCustomerId = newCustomer.Id
          };
 
          var createResult = await _userManager.CreateAsync(newUser, Password);
+
          if (createResult.Succeeded) {
-            await _userManager.AddClaimAsync(newUser, new Claim(ClaimsConstants.OASIS_USER_TYPE, "customer"));
+            await _userManager.AddClaimAsync(newUser, new Claim(AppConstants.OASIS_USER_TYPE, "customer"));
+            await _userManager.AddClaimAsync(newUser,
+               new Claim(AppConstants.StripeCustomerIdClaimType, newCustomer.Id));
             await _signInManager.SignInAsync(newUser, isPersistent: false);
             return RedirectToPage("/Index");
          }

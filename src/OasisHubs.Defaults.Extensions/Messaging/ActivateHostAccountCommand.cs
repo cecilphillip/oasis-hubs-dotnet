@@ -1,12 +1,11 @@
 ﻿using Paramore.Brighter;
-using Stripe;
 
-namespace OasisHubs.Site.Messaging;
+namespace OasisHubs.Defaults.Extensions.Messaging;
 
 public class ActivateHostAccountCommand : Command {
    public SlimAccount Account { get; init; }
 
-   public ActivateHostAccountCommand(Account sourceAccount) : base(Guid.NewGuid())
+   public ActivateHostAccountCommand(Stripe.Account sourceAccount) : base(Guid.NewGuid())
       => this.Account = new SlimAccount(sourceAccount.Id, sourceAccount.Email,
          sourceAccount.DetailsSubmitted, sourceAccount.ChargesEnabled,
          sourceAccount.Metadata.GetValueOrDefault("owner.customer.id", string.Empty));

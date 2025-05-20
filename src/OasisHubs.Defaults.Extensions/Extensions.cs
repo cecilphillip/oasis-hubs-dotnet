@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using OpenTelemetry;
+using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -27,7 +28,7 @@ public static class Extensions {
 
       return builder;
    }
-   public static TBuilder ConfigureOpenTelemetry<TBuilder>(this TBuilder builder, string serviceName)
+   public static OpenTelemetryBuilder ConfigureOpenTelemetry<TBuilder>(this TBuilder builder, string serviceName)
       where TBuilder : IHostApplicationBuilder {
       builder.Logging.AddOpenTelemetry(logging => {
          logging.IncludeFormattedMessage = true;
@@ -37,19 +38,18 @@ public static class Extensions {
       var otelBuilder = builder.Services.AddOpenTelemetry()
          .ConfigureResource(r => r.AddService(serviceName, "oasisHubs", "v2.0.0")
             .AddTelemetrySdk()
-            .AddAttributes(new Dictionary<string, object>
-            {
-               ["environment.name"] = builder.Environment.EnvironmentName,
-               ["demo.type"] = "oasis.stripe.connect"
+            .AddAttributes(new Dictionary<string, object> {
+               ["environment.name"] = builder.Environment.EnvironmentName, ["demo.type"] = "oasis.stripe.connect"
             })
-            .AddEnvironmentVariableDetector())
+            .AddEnvironmentVariableDetector()
+         )
          .WithMetrics(metrics => {
             metrics.AddAspNetCoreInstrumentation()
                .AddHttpClientInstrumentation()
                .AddRuntimeInstrumentation();
          })
          .WithTracing(tracing => {
-            tracing.AddSource(builder.Environment.ApplicationName)
+            tracing
                .AddAspNetCoreInstrumentation(tracing =>
                   // Exclude health check requests from tracing
                   tracing.Filter = context =>
@@ -58,6 +58,9 @@ public static class Extensions {
                )
                .AddHttpClientInstrumentation();
          });
+         // .WithLogging(logging => {
+         //    logging.AddConsoleExporter();
+         // })
       
       var useOtlpExporter = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
 
@@ -66,7 +69,7 @@ public static class Extensions {
          otelBuilder.UseOtlpExporter();
       }
         
-      return builder;
+      return otelBuilder;
    }
    
    public static IHealthChecksBuilder AddDefaultHealthChecks<TBuilder>(this TBuilder builder)
@@ -87,5 +90,11 @@ public static class Extensions {
             new HealthCheckOptions { Predicate = r => r.Tags.Contains("live") });
 
       return app;
+   }
+   
+   public static void Deconstruct<T>(this IGrouping<string, T> grouping,
+      out string groupKey, out IEnumerable<T> collection) {
+      groupKey = grouping.Key;
+      collection = grouping;
    }
 }

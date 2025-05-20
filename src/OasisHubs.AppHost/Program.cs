@@ -9,14 +9,14 @@ var database = sqlServer.AddDatabase("OasisHubsDb");
 
 var rabbitPwd = builder.AddParameter("rabbitmqPassword", true);
 var rabbitUsr = builder.AddParameter("rabbitmqUsername", true);
-var rmq = builder.AddRabbitMQ("rmq", rabbitUsr, rabbitPwd, 5672)
+var rabbitServer = builder.AddRabbitMQ("rabbitServer", rabbitUsr, rabbitPwd, 5672)
    //.WithEnvironment("RABBITMQ_DEFAULT_VHOST", "oasis")
    .WithBindMount(".config/rabbitmq/rabbitmq_enabled_plugins", "/etc/rabbitmq/enabled_plugins")
    .WithManagementPlugin(15672)
    .WithLifetime(ContainerLifetime.Persistent);
 
 var redisPwd = builder.AddParameter("redisPassword", true);
-var redisCache = builder.AddRedis("basketCache", 6379, redisPwd)
+var redisCache = builder.AddRedis("redisCache", 6379, redisPwd)
    .WithDataBindMount(".temp/redis/data")
    .WithBindMount("./.config/redis", "/usr/local/etc/redis")
    .WithRedisInsight()
@@ -31,14 +31,20 @@ builder.AddProject<Projects.OasisHubs_DataInitializer>("dataInitializer")
    .WithReference(database)
    .WaitFor(database);
 
+builder.AddProject<Projects.OasisHubs_BackgroundProcessor>("processor")
+   .WithReference(redisCache)
+   .WithReference(rabbitServer)
+   .WaitFor(rabbitServer)
+   .WaitFor(redisCache);
+
 // builder.AddProject<Projects.OasisHubs_Site>("mainsite")
 //    // Add references
-//    .WithReference(rmq)
+//    .WithReference(rabbitServer)
 //    .WithReference(redisCache)
 //    .WithReference(database)
 //    
 //    // Wait for references
-//    .WaitFor(rmq)
+//    .WaitFor(rabbitServer)
 //    .WaitFor(redisCache)
 //    .WaitFor(sqlServer);
 

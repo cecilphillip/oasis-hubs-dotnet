@@ -3,7 +3,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
-using OasisHubs.Site.Data;
+using OasisHubs.DbModels;
+
 
 namespace OasisHubs.Site.Pages;
 

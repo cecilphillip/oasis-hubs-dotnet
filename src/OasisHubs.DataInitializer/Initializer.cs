@@ -2,7 +2,9 @@
 using Bogus;
 using Microsoft.AspNetCore.Identity;
 using OasisHubs.DbModels;
+using OasisHubs.Defaults.Extensions;
 using Stripe;
+using Stripe.Billing;
 using Stripe.TestHelpers;
 
 namespace OasisHubs.DataInitializer;
@@ -29,6 +31,9 @@ public class Initializer(IServiceProvider serviceProvider, IHostApplicationLifet
       
       // Create test users with Stripe customers and connected accounts for hosts
       await CreateUsers(stripeClient, userManager);
+      
+      // Create Stripe usage meter
+      await CreateUsageMeter(stripeClient);
       
       // Initialize subscription tiers as Stripe products with pricing configurations
       await CreateHubTierProductsAsync(stripeClient);
@@ -113,7 +118,8 @@ public class Initializer(IServiceProvider serviceProvider, IHostApplicationLifet
       await userManager.CreateAsync(newUser, "test");
 
       // add claim
-      await userManager.AddClaimAsync(newUser, new Claim(ClaimsConstants.OASIS_USER_TYPE, "customer"));
+      await userManager.AddClaimAsync(newUser, new Claim(AppConstants.OASIS_USER_TYPE, "customer"));
+      await userManager.AddClaimAsync(newUser, new Claim(AppConstants.StripeCustomerIdClaimType, newCustomer.Id));
       logger.LogDebug("Created user {CustomerName}", ccOptions.Name);
 
       // update Stripe customer with oasis customer id
@@ -378,12 +384,17 @@ public class Initializer(IServiceProvider serviceProvider, IHostApplicationLifet
          MarketingFeatures = features.Select(f => new ProductMarketingFeatureOptions { Name = f }).ToList(),
          UnitLabel = "hour",
          Metadata =
-            new Dictionary<string, string> { ["hub.tier"] = "true", ["tier.image"] = imageFileName },
+            new Dictionary<string, string> { ["hub.tier"] = priceLookupPrefix, ["tier.image"] = imageFileName },
          
          //TODO: investigate setting the default price here
       };
 
       var newHubProduct = await stripeClient.V1.Products.CreateAsync(prodCreateOptions);
+      var meter = await GetExistingMeterAsync(stripeClient);
+      if (meter is null) {
+         logger.LogCritical("No meter found for pricing tiers");
+         throw new Exception("Required meter not found");
+      }
 
       // Create flat price in product
       var priceCreateOptions = new PriceCreateOptions {
@@ -413,12 +424,50 @@ public class Initializer(IServiceProvider serviceProvider, IHostApplicationLifet
             new() { UnitAmount = 0, UpTo = 10 }, 
             new() { UnitAmount = hourlyUnitPrice / 10, UpTo = PriceTierUpTo.Inf }
          ],
-         Recurring = new PriceRecurringOptions { Interval = "month", UsageType = "metered" },
+         Recurring = new PriceRecurringOptions { Interval = "month", UsageType = "metered", Meter = meter.Id },
          TiersMode = "graduated",
          BillingScheme = "tiered"
       };
 
       newProductPrice = await stripeClient.V1.Prices.CreateAsync(priceCreateOptions);
       logger.LogDebug("Metered price ({PriceId}) created ", newProductPrice.Id);
+   }
+   
+   private async Task CreateUsageMeter(StripeClient stripeClient) {
+    
+      logger.LogInformation("Attempting meter creation");
+      
+      var meter = await GetExistingMeterAsync(stripeClient);
+      if (meter is null) {
+         var meterCreateOptions = new MeterCreateOptions {
+            DisplayName = "Hub Usage Meter",
+            EventName = AppConstants.ReportUsageEventName,
+            DefaultAggregation = new MeterDefaultAggregationOptions { Formula = "sum", },
+            ValueSettings = new MeterValueSettingsOptions { EventPayloadKey = AppConstants.ReportUsageEventValue },
+            CustomerMapping =
+               new MeterCustomerMappingOptions { Type = "by_id", EventPayloadKey = "stripe_customer_id", },
+         };
+         
+         meter = await stripeClient.V1.Billing.Meters.CreateAsync(meterCreateOptions);
+         logger.LogInformation("New meter created ({MeterId})", meter.Id);
+      }
+      else {
+         logger.LogInformation("Existing meter found for event ({MeterEvent}. Skipping meter creation)", meter.EventName);
+      }
+   }
+   
+   private async Task<Meter?> GetExistingMeterAsync(StripeClient stripeClient)
+   {
+      var existingMeters = await  stripeClient.V1.Billing.Meters.ListAsync(new () { Limit = 3 });
+
+      foreach (var meter in existingMeters)
+      {
+         if(meter.EventName == AppConstants.ReportUsageEventName)
+         {
+            return meter;
+         }
+      }
+
+      return null;
    }
 }

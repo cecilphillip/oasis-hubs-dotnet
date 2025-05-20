@@ -2,7 +2,8 @@ using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using OasisHubs.Site.Data;
+using OasisHubs.DbModels;
+
 
 namespace OasisHubs.Site.Pages;
 public class SignInModel : PageModel
@@ -59,7 +60,7 @@ public class SignInModel : PageModel
 
             if (result.Succeeded)
             {
-                _logger.LogInformation("User logged in.");
+                _logger.LogInformation("User logged in");
                 return LocalRedirect(returnUrl);
             }
             // if (result.IsLockedOut) {

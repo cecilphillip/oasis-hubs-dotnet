@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using OasisHubs.Site.Data;
+using OasisHubs.DbModels;
 
 namespace OasisHubs.Site.Pages;
 
@@ -20,7 +20,7 @@ public class SignOutModel : PageModel
     public async Task<IActionResult> OnPostAsync(string? returnUrl = null)
     {
         await _signInManager.SignOutAsync();
-        _logger.LogInformation("User logged out.");
+        _logger.LogInformation("User logged out");
 
         if (returnUrl != null)
         {

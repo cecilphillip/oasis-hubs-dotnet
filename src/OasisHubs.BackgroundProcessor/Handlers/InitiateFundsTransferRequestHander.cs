@@ -1,44 +1,40 @@
 ﻿using System.Globalization;
 using Microsoft.EntityFrameworkCore;
-using OasisHubs.Site.Data;
+using OasisHubs.DbModels;
+using OasisHubs.Defaults.Extensions.Messaging;
 using Paramore.Brighter;
 using Paramore.Brighter.Inbox;
 using Paramore.Brighter.Inbox.Attributes;
 using Stripe;
 
-namespace OasisHubs.Site.Messaging;
+namespace OasisHubs.BackgroundProcessor.Handlers;
 
 public class
    InitiateFundsTransferRequestHandler : RequestHandlerAsync<InitiateFundsTransferCommand> {
-   private readonly IDbContextFactory<OasisHubsDbContext> _dbContextFactory;
-   private readonly IStripeClient _stripeClient;
-   private readonly ILogger<ActivateHostRequestHandler> _logger;
+   private readonly OasisHubsDbContext _dbContext;
+   private readonly StripeClient _stripeClient;
+   private readonly ILogger<InitiateFundsTransferRequestHandler> _logger;
 
    private const decimal DISTRIBUTABLE_PERCENTAGE = 0.75m;
 
    public InitiateFundsTransferRequestHandler(
-      IDbContextFactory<OasisHubsDbContext> dbContextFactory, IStripeClient stripeClient,
-      ILogger<ActivateHostRequestHandler> logger) {
-      this._dbContextFactory = dbContextFactory;
+      OasisHubsDbContext dbContext, StripeClient stripeClient,
+      ILogger<InitiateFundsTransferRequestHandler> logger) {
+      this._dbContext = dbContext;
       this._stripeClient = stripeClient;
       this._logger = logger;
    }
-
-
 
   [UseInboxAsync(step:0, contextKey: typeof(InitiateFundsTransferRequestHandler), onceOnly: true, onceOnlyAction: OnceOnlyAction.Warn)]
    public override async Task<InitiateFundsTransferCommand> HandleAsync(
       InitiateFundsTransferCommand command,
       CancellationToken cancellationToken = new()) {
       if (command.Invoice == null) {
-         _logger.LogError("Invoice information missing from command.");
+         this._logger.LogError("Invoice information missing from command");
          throw new ArgumentNullException(nameof(command), "Account information missing.");
       }
-
-      await using var context =
-         await this._dbContextFactory.CreateDbContextAsync(cancellationToken);
-
-      var invoiceBookings = await context.Bookings
+      
+      var invoiceBookings = await this._dbContext.Bookings
          .Include(booking => booking.Renter)
          .Include(booking => booking.Rental)
          .Where(b =>
@@ -49,7 +45,7 @@ public class
       var distributableTotal = command.Invoice.Total * DISTRIBUTABLE_PERCENTAGE;
       var totalReportedHours = invoiceBookings.Sum(i => i.Hours);
 
-      _logger.LogInformation("Processing invoice {InvoiceId} with total hours {TotalHours}",
+      this._logger.LogInformation("Processing invoice {InvoiceId} with total hours {TotalHours}",
          command.Invoice.InvoiceId, totalReportedHours);
 
       var transferService = new TransferService(this._stripeClient);
@@ -65,7 +61,7 @@ public class
                Amount = transferAmount,
                Currency = "usd",
                Destination = accountId,
-               SourceTransaction = command.Invoice.ChargeId,
+               //SourceTransaction = command.Invoice.,
                Metadata = new Dictionary<string, string> {
                   ["invoice.id"] = command.Invoice.InvoiceId,
                   ["invoice.hours.total"] = totalReportedHours.ToString(CultureInfo.InvariantCulture),
@@ -77,13 +73,13 @@ public class
             //TODO: Catch Stripe exception
             await transferService.CreateAsync(transOptions,cancellationToken: cancellationToken);
 
-            _logger.LogInformation(
+            this._logger.LogInformation(
                "Transfer initiated for ${TransferAmount} to account ({ConnectAccountId}) from invoice ({InvoiceId})",
                (transferAmount / 100m), accountId, command.Invoice.InvoiceId);
          }
       }
       else {
-         _logger.LogWarning("No bookings found for invoice billing period {InvoiceId}",
+         this._logger.LogWarning("No bookings found for invoice billing period {InvoiceId}",
             command.Invoice.InvoiceId);
       }
 

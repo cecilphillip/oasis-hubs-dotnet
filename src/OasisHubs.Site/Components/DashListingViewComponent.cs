@@ -1,5 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using OasisHubs.Site.Data;
+using OasisHubs.DbModels;
 using Stripe;
 
 namespace OasisHubs.Site.Components;

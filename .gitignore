@@ -403,5 +403,5 @@ FodyWeavers.xsd
 
 node_modules/
 tmp/
-.temp/*
+**/.temp/**/
 .idea/

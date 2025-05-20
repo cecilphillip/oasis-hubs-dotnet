@@ -22,6 +22,7 @@
     </ItemGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\OasisHubs.BackgroundProcessor\OasisHubs.BackgroundProcessor.csproj" />
       <ProjectReference Include="..\OasisHubs.DataInitializer\OasisHubs.DataInitializer.csproj" />
       <ProjectReference Include="..\OasisHubs.Site\OasisHubs.Site.csproj" />
     </ItemGroup>

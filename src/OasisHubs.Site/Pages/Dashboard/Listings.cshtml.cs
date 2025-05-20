@@ -2,7 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
-using OasisHubs.Site.Data;
+using OasisHubs.DbModels;
 
 namespace OasisHubs.Site.Pages.Dashboard;
 
@@ -12,7 +12,7 @@ public class Listings : PageModel {
    private readonly IDbContextFactory<OasisHubsDbContext> _dbContextFactory;
 
    public OasisHubsUser? OasisUser { get; set; }
-   public IEnumerable<HubRental> Rentals { get; set; } = Enumerable.Empty<HubRental>();
+   public IEnumerable<HubRental> Rentals { get; set; } = [];
 
    public Listings(UserManager<OasisHubsUser> userManager,
       IDbContextFactory<OasisHubsDbContext> dbContextFactory, ILogger<Listings> logger) {
@@ -25,7 +25,7 @@ public class Listings : PageModel {
       OasisUser = await _userManager.GetUserAsync(HttpContext.User);
 
       if (OasisUser is null) {
-         this._logger.LogCritical("Host user record not found.");
+         this._logger.LogCritical("Host user record not found");
          return RedirectToPage("/Index");
       }
 
@@ -40,7 +40,7 @@ public class Listings : PageModel {
       OasisUser = await _userManager.GetUserAsync(HttpContext.User);
 
       if (OasisUser is null) {
-         this._logger.LogCritical("Host user record not found.");
+         this._logger.LogCritical("Host user record not found");
          return RedirectToPage("/Index");
       }
 
@@ -56,13 +56,13 @@ public class Listings : PageModel {
          ReferenceCode = ReferenceCodeGenerator.GetUniqueKey()
       };
 
-      _logger.LogInformation("Creating stripe product for {ProductName}.", newRental.Title);
+      _logger.LogInformation("Creating stripe product for {ProductName}", newRental.Title);
 
-      // Save product in the database
+      // Save a product in the database
       await using var context = await this._dbContextFactory.CreateDbContextAsync();
       context.HubRentals.Add(newRental);
       await context.SaveChangesAsync();
-      _logger.LogInformation("HubRental {ProductName} created in database.", newRental.Title);
+      _logger.LogInformation("HubRental {ProductName} created in database", newRental.Title);
 
       return RedirectToPage("/dashboard/listings");
    }

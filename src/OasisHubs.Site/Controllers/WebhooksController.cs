@@ -1,5 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using OasisHubs.Site.Messaging;
+using OasisHubs.Defaults.Extensions.Messaging;
 using Paramore.Brighter;
 using Stripe;
 using Subscription = Stripe.Subscription;
@@ -31,17 +31,16 @@ public class WebhooksController : ControllerBase {
          );
 
          switch (stripeEvent.Type) {
-            case Events.InvoicePaid: {
+            case EventTypes.InvoicePaid: {
+               
                var invoice = (stripeEvent.Data.Object as Invoice)!;
                if (invoice is { Status: "paid" }) {
-                  this._logger.LogDebug(
-                     "Initiating funds transfer for paid invoice ({InvoiceId})",
-                     invoice.Id);
+                  this._logger.LogDebug("Initiating funds transfer for paid invoice ({InvoiceId})",invoice.Id);
                   await this._commandProcessor.PostAsync(new InitiateFundsTransferCommand(invoice));
                }
                break;
             }
-            case Events.CustomerSubscriptionCreated: {
+            case EventTypes.CustomerSubscriptionCreated: {
                var newSubscription = (stripeEvent.Data.Object as Subscription)!;
 
                if (newSubscription is { Status: "active" }) {
@@ -54,7 +53,7 @@ public class WebhooksController : ControllerBase {
 
                break;
             }
-            case Events.CustomerSubscriptionUpdated: {
+            case EventTypes.CustomerSubscriptionUpdated: {
                var updatedSubscription = (stripeEvent.Data.Object as Subscription)!;
                if (updatedSubscription is { Status: "active" }) {
                   this._logger.LogDebug(
@@ -90,7 +89,7 @@ public class WebhooksController : ControllerBase {
          );
 
          switch (stripeEvent.Type) {
-            case Events.AccountUpdated: {
+            case EventTypes.AccountUpdated: {
                var updatedAccount = (stripeEvent.Data.Object as Account)!;
                if (updatedAccount is { DetailsSubmitted: true, ChargesEnabled: true })
                   await this._commandProcessor.PostAsync(

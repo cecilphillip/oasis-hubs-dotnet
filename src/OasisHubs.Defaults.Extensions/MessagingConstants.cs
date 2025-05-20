@@ -1,4 +1,4 @@
-﻿namespace OasisHubs.Site.Messaging;
+﻿namespace OasisHubs.Defaults.Extensions;
 
 public static class MessagingConstants {
    public const string DEFAULT_DLQ_EXCHANGE = "oasis.brighter.exchange.dlq";

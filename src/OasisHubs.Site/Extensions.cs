@@ -1,7 +1,9 @@
+using System.Threading.Channels;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
-using OasisHubs.Site.Data;
-using OasisHubs.Site.Messaging;
+using Microsoft.Extensions.Caching.StackExchangeRedis;
+using OasisHubs.DbModels;
+using OasisHubs.Defaults.Extensions;
+using OasisHubs.Defaults.Extensions.Messaging;
 using OasisHubs.Site.Policies;
 using Paramore.Brighter;
 using Paramore.Brighter.Extensions.DependencyInjection;
@@ -9,69 +11,25 @@ using Paramore.Brighter.MessagingGateway.RMQ;
 using Paramore.Brighter.ServiceActivator.Extensions.DependencyInjection;
 using Paramore.Brighter.ServiceActivator.Extensions.Hosting;
 using RabbitMQ.Client;
-using Serilog;
-using Stripe;
+using ZiggyCreatures.Caching.Fusion;
+using Channel = System.Threading.Channels.Channel;
 
 namespace OasisHubs.Site;
 
 internal static class Extensions {
-   public static WebApplication ConfigureServices(this WebApplicationBuilder builder) {
-      builder.Host.UseSerilog((context, _, configuration) => configuration
-         .ReadFrom.Configuration(context.Configuration));
-
-      builder.Services.AddCoreServices(builder.Configuration);
-      builder.Services.AddMessagingService(builder.Configuration);
-
-      builder.Services.AddDatabaseDeveloperPageExceptionFilter();
-
-      builder.Services.AddAuthorizationBuilder()
-         .AddPolicy("is_host_policy",
-            policy => policy.AddRequirements(new HostAuthPolicyRequirement()))
-         .AddPolicy("can_view_listings",
-            policy => policy.AddRequirements(new CanViewListingsPolicyRequirement()));
-
-      builder.Services.ConfigureApplicationCookie(options => {
-         options.Cookie.HttpOnly = true;
-         options.ExpireTimeSpan = TimeSpan.FromMinutes(20);
-         options.SlidingExpiration = true;
-         options.LoginPath = "/Signin";
-         options.AccessDeniedPath = "/Pricing"; //TODO: Need a better option for this
-      });
-
-      builder.Services.AddSession(options => {
-         options.IdleTimeout = TimeSpan.FromSeconds(20);
-         options.Cookie.Name = "OasisHubsSession";
-         options.Cookie.HttpOnly = true;
-         options.Cookie.IsEssential = false;
-         options.Cookie.SameSite = SameSiteMode.Strict;
-      });
-
-      builder.Services.Configure<HostOptions>(options =>
-         options.ShutdownTimeout = TimeSpan.FromSeconds(20));
-
-      builder.Services.Configure<RouteOptions>(options => {
-         options.LowercaseQueryStrings = true;
-         options.LowercaseUrls = true;
-      });
-
-      builder.Services.AddRazorPages(options => {
-         options.Conventions.AuthorizePage("/Hosts/SignUp");
-         options.Conventions.AuthorizeFolder("/Dashboard", "is_host_policy");
-      });
-
-      builder.Services.AddControllers();
+   public static WebApplication ConfigureAppServices(this WebApplicationBuilder builder) {
+      
+      builder.AddSqlServerDbContext<OasisHubsDbContext>("OasisHubsDb");
+      builder.Services.AddCoreServices(builder.Configuration)
+         .AddMessagingServices(builder.Configuration)
+         .AddAuthServices()
+         .AddRazorAppServices();
+      
       return builder.Build();
    }
 
    public static WebApplication ConfigurePipeline(this WebApplication app) {
-      if (app.Environment.IsDevelopment()) {
-         app.UseMigrationsEndPoint();
-      }
-      else {
-         app.UseExceptionHandler("/Error");
-         app.UseHsts();
-      }
-
+     
       app.UseStaticFiles();
 
       app.UseRouting();
@@ -79,46 +37,16 @@ internal static class Extensions {
       app.UseAuthentication();
       app.UseAuthorization();
 
-      app.UseSession();
-
       app.MapControllers();
       app.MapRazorPages();
 
       return app;
    }
+   
 
-   public static IServiceCollection AddStripe(this IServiceCollection services,
-      IConfiguration config) {
-      StripeConfiguration.ApiKey = config.GetValue<string>("SecretKey");
-
-      var appInfo = new AppInfo { Name = "Oasis Hubs", Version = "0.1.0" };
-      StripeConfiguration.AppInfo = appInfo;
-
-      services.AddHttpClient("Stripe");
-      services.AddTransient<IStripeClient, StripeClient>(s => {
-         var clientFactory = s.GetRequiredService<IHttpClientFactory>();
-         var httpClient = new SystemNetHttpClient(
-            httpClient: clientFactory.CreateClient("Stripe"),
-            maxNetworkRetries: StripeConfiguration.MaxNetworkRetries,
-            appInfo: appInfo,
-            enableTelemetry: StripeConfiguration.EnableTelemetry);
-
-         return new StripeClient(apiKey: StripeConfiguration.ApiKey, httpClient: httpClient);
-      });
-
-      return services;
-   }
-
-   public static IServiceCollection AddCoreServices(this IServiceCollection services,
-      IConfiguration config) {
-      services.AddDbContextPool<OasisHubsDbContext>(options =>
-         options.UseSqlServer(config.GetConnectionString("OasisHubsSQLServer"),
-            opts => opts.EnableRetryOnFailure()));
-
-      services.AddPooledDbContextFactory<OasisHubsDbContext>(options =>
-         options.UseSqlServer(config.GetConnectionString("OasisHubsSQLServer"),
-            opts => opts.EnableRetryOnFailure()));
-
+   private static IServiceCollection AddCoreServices(this IServiceCollection services,
+      IConfiguration configuration) {
+      
       services.AddIdentity<OasisHubsUser, IdentityRole>(options => {
             options.User.RequireUniqueEmail = true;
          })
@@ -135,15 +63,32 @@ internal static class Extensions {
          options.Password.RequiredUniqueChars = 0;
       });
 
-      services.AddStripe(config.GetSection("Stripe"));
-      services.AddDistributedMemoryCache();
+      services.AddStripe();
+      
+      var redisConnection = configuration.GetConnectionString("redisCache");
+      services.AddFusionCache()
+         .WithDefaultEntryOptions(new FusionCacheEntryOptions
+         {
+            Duration = TimeSpan.FromMinutes(4),
+            IsFailSafeEnabled = true,
+            FailSafeMaxDuration = TimeSpan.FromMinutes(2),
+         })
+         .WithCacheKeyPrefix("oasisHubs:main:")
+         .WithSystemTextJsonSerializer()
+         .WithDistributedCache(new RedisCache(new RedisCacheOptions { Configuration = redisConnection }));
+      
+      services.AddSingleton<Channel<HubUsageReport>>( _ => Channel.CreateUnbounded<HubUsageReport>(new()
+      {
+         SingleReader = true,
+         AllowSynchronousContinuations = false
+      }));
 
       return services;
    }
 
-   public static IServiceCollection AddMessagingService(this IServiceCollection services,
+   private static IServiceCollection AddMessagingServices(this IServiceCollection services,
       IConfiguration configuration) {
-      var rabbitConnectionString = configuration.GetConnectionString("OasisHubsRabbitMQ");
+      var rabbitConnectionString = configuration.GetConnectionString("redisCache");
       if (rabbitConnectionString is null)
          throw new Exception("RabbitMQ Connection information missing");
 
@@ -238,9 +183,37 @@ internal static class Extensions {
       return services;
    }
 
-   public static void Deconstruct<T>(this IGrouping<string, T> grouping,
-      out string groupKey, out IEnumerable<T> collection) {
-      groupKey = grouping.Key;
-      collection = grouping;
+   private static IServiceCollection AddAuthServices(this IServiceCollection services) {
+      services.AddAuthorizationBuilder()
+         .AddPolicy("is_host_policy",
+            policy => policy.AddRequirements(new HostAuthPolicyRequirement()))
+         .AddPolicy("can_view_listings",
+            policy => policy.AddRequirements(new CanViewListingsPolicyRequirement()));
+
+      services.ConfigureApplicationCookie(options => {
+         options.Cookie.HttpOnly = true;
+         options.ExpireTimeSpan = TimeSpan.FromMinutes(20);
+         options.SlidingExpiration = true;
+         options.LoginPath = "/Signin";
+         options.AccessDeniedPath = "/Pricing"; //TODO: Need a better option for this
+      });
+      
+      return services;
+   }
+
+   private static IServiceCollection AddRazorAppServices(this IServiceCollection services) {
+      services.Configure<RouteOptions>(options => {
+         options.LowercaseQueryStrings = true;
+         options.LowercaseUrls = true;
+      });
+
+      services.AddRazorPages(options => {
+         options.Conventions.AuthorizePage("/Hosts/SignUp");
+         options.Conventions.AuthorizeFolder("/Dashboard", "is_host_policy");
+      });
+
+      services.AddControllers();
+      
+      return services;
    }
 }

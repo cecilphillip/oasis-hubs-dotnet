@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using OasisHubs.Site.Data;
+using OasisHubs.DbModels;
 using Stripe;
 using Stripe.Checkout;
 
@@ -14,7 +14,7 @@ public class Pricing : PageModel {
    private readonly ILogger<Pricing> _logger;
    private const string _tierMetaKey = "hub.tier";
 
-   public IEnumerable<Product> HubTierListings { get; set; } = Enumerable.Empty<Product>();
+   public IEnumerable<Product> HubTierListings { get; set; } = [];
 
    public Pricing(UserManager<OasisHubsUser> userManager, IStripeClient stripeClient,
       LinkGenerator linkGenerator, ILogger<Pricing> logger) {
@@ -57,10 +57,10 @@ public class Pricing : PageModel {
 
       var priceService = new PriceService(this._stripeClient);
       var prices = await priceService.ListAsync(plOptions);
+      //TODO: Clean up this query
       var lineItems = prices.Select(p => new SessionLineItemOptions {
          Price = p.Id, Quantity = !p.LookupKey.EndsWith("_tiered") ? 1 : null
       }).ToList();
-
 
       var basePageUri = _linkGenerator.GetUriByPage(this.HttpContext, "/Index");
       var scOptions = new SessionCreateOptions {
