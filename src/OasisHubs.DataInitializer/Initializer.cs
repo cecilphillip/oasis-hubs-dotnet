@@ -385,8 +385,6 @@ public class Initializer(IServiceProvider serviceProvider, IHostApplicationLifet
          UnitLabel = "hour",
          Metadata =
             new Dictionary<string, string> { ["hub.tier"] = priceLookupPrefix, ["tier.image"] = imageFileName },
-         
-         //TODO: investigate setting the default price here
       };
 
       var newHubProduct = await stripeClient.V1.Products.CreateAsync(prodCreateOptions);

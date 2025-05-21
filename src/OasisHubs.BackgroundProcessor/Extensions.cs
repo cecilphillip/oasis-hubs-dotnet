@@ -6,6 +6,7 @@ using Paramore.Brighter.ServiceActivator.Extensions.Hosting;
 using OasisHubs.DbModels;
 using OasisHubs.Defaults.Extensions;
 using OasisHubs.Defaults.Extensions.Messaging;
+using Paramore.Brighter.Extensions.DependencyInjection;
 using RabbitMQ.Client;
 
 namespace OasisHubs.BackgroundProcessor;
@@ -29,8 +30,7 @@ internal static class Extensions {
       
       var rmqMessagingConnection = new RmqMessagingGatewayConnection {
          Name = "OasisHubsRMQConnection",
-         AmpqUri = new AmqpUriSpecification(new Uri(rabbitConnectionString),
-            connectionRetryCount: 5, retryWaitInMilliseconds: 250),
+         AmpqUri = new AmqpUriSpecification(new Uri(rabbitConnectionString)),
          //https://www.rabbitmq.com/tutorials/amqp-concepts.html#exchange-direct
          Exchange = new Exchange(MessagingConstants.DEFAULT_EXCHANGE, ExchangeType.Direct, true),
          DeadLetterExchange =
@@ -45,8 +45,7 @@ internal static class Extensions {
             new RoutingKey(MessagingConstants.HOST_UPDATED_TOPIC),
             deadLetterChannelName: new ChannelName(MessagingConstants.DEFAULT_DLQ_CHANNEL),
             deadLetterRoutingKey: MessagingConstants.DEFAULT_DLQ_ROUTING_KEY,
-            requeueCount: 2, emptyChannelDelay:1000,
-            runAsync: true, isDurable: true,
+            requeueCount: 2, runAsync: true, isDurable: true,
             makeChannels: OnMissingChannel.Create),
          new RmqSubscription<ActivateCustomerSubscriptionCommand>(
             new SubscriptionName(MessagingConstants.SUBSCRIPTION_ACTIVATED_SUBSCRIPTION),
@@ -54,8 +53,7 @@ internal static class Extensions {
             new RoutingKey(MessagingConstants.SUBSCRIPTION_ACTIVATED_TOPIC),
             deadLetterChannelName: new ChannelName(MessagingConstants.DEFAULT_DLQ_CHANNEL),
             deadLetterRoutingKey: MessagingConstants.DEFAULT_DLQ_ROUTING_KEY,
-            requeueCount: 2,emptyChannelDelay:1000,
-            runAsync: true, isDurable: true,
+            requeueCount: 2, runAsync: true, isDurable: true,
             makeChannels: OnMissingChannel.Create),
          new RmqSubscription<InitiateFundsTransferCommand>(
             new SubscriptionName(MessagingConstants.FUNDS_TRANSFER_SUBSCRIPTION),
@@ -63,8 +61,7 @@ internal static class Extensions {
             new RoutingKey(MessagingConstants.FUNDS_TRANSFER_TOPIC),
             deadLetterChannelName: new ChannelName(MessagingConstants.DEFAULT_DLQ_CHANNEL),
             deadLetterRoutingKey: MessagingConstants.DEFAULT_DLQ_ROUTING_KEY,
-            requeueCount: 2, emptyChannelDelay:1000,
-            runAsync: true, isDurable: true,
+            requeueCount: 2, runAsync: true, isDurable: true,
             makeChannels: OnMissingChannel.Create)];
       
       builder.Services.AddServiceActivator(options => {
@@ -78,6 +75,7 @@ internal static class Extensions {
          options.ChannelFactory = new ChannelFactory(rmqMessageConsumerFactory);
          options.Subscriptions = subscriptions;
       })
+      .UseInMemoryInbox()
       .AutoFromAssemblies();
       
       builder.Services.AddHostedService<ServiceActivatorHostedService>();

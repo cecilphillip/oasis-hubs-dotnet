@@ -1,11 +1,9 @@
 ﻿using System.Net.Mime;
 using System.Runtime.Serialization;
 using System.Text.Json;
-using OasisHubs.Defaults.Extensions;
-using OasisHubs.Defaults.Extensions.Messaging;
 using Paramore.Brighter;
 
-namespace OasisHubs.Site.Messaging;
+namespace OasisHubs.Defaults.Extensions.Messaging;
 
 public class ActivateCustomerSubscriptionMessageMapper : IAmAMessageMapper<ActivateCustomerSubscriptionCommand> {
    public Message MapToMessage(ActivateCustomerSubscriptionCommand request) {
