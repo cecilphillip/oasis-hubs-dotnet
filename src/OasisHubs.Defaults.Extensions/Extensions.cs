@@ -1,19 +1,22 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using OpenTelemetry;
-using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using Paramore.Brighter;
 
 namespace Microsoft.Extensions.Hosting;
 
 public static class Extensions {
-   private const string HealthEndpointPath = "/health";
-   private const string AlivenessEndpointPath = "/alive";
+   private const string _healthEndpointPath = "/health";
+   private const string _healthLivenessEndpointPath = "/health/live";
+   private const string _healthDetailsEndpointPath = "/health/details";
 
    public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder {
       builder.Services.AddServiceDiscovery();
@@ -50,11 +53,12 @@ public static class Extensions {
          })
          .WithTracing(tracing => {
             tracing
-               .AddAspNetCoreInstrumentation(tracing =>
+               .AddAspNetCoreInstrumentation(tb =>
                   // Exclude health check requests from tracing
-                  tracing.Filter = context =>
-                     !context.Request.Path.StartsWithSegments(HealthEndpointPath)
-                     && !context.Request.Path.StartsWithSegments(AlivenessEndpointPath)
+                  tb.Filter = context =>
+                     !context.Request.Path.StartsWithSegments(_healthEndpointPath)
+                     && !context.Request.Path.StartsWithSegments(_healthLivenessEndpointPath)
+                     && !context.Request.Path.StartsWithSegments(_healthDetailsEndpointPath)
                )
                .AddHttpClientInstrumentation();
          });
@@ -83,11 +87,34 @@ public static class Extensions {
 
    public static WebApplication MapDefaultEndpoints(this WebApplication app) {
          // All health checks must pass to be considered ready to accept traffic after starting
-         app.MapHealthChecks(HealthEndpointPath);
+         app.MapHealthChecks(_healthEndpointPath);
 
          // Only health checks tagged with "live" tag must pass to be considered alive
-         app.MapHealthChecks(AlivenessEndpointPath,
+         app.MapHealthChecks(_healthLivenessEndpointPath,
             new HealthCheckOptions { Predicate = r => r.Tags.Contains("live") });
+         
+         // Add a detailed health check endpoint
+         app.MapHealthChecks(_healthDetailsEndpointPath, new HealthCheckOptions
+         {
+            ResponseWriter = async (context, report) =>
+            {
+               var content = new
+               {
+                  Status = report.Status.ToString(),
+                  Results = report.Entries.ToDictionary(e => e.Key,
+                     e => new
+                     {
+                        Status = e.Value.Status.ToString(),
+                        e.Value.Description,
+                        e.Value.Duration
+                     }),
+                  report.TotalDuration
+               };
+
+               context.Response.ContentType = "application/json";
+               await context.Response.WriteAsync(JsonSerializer.Serialize(content, JsonSerialisationOptions.Options));
+            }
+         });
 
       return app;
    }

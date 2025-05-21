@@ -18,6 +18,9 @@ public class IndexModel : PageModel {
 
     public async Task<IActionResult> OnGetAsync() {
         OasisUser = await _userManager.GetUserAsync(HttpContext.User);
+        
+        if (OasisUser != null) 
+           await this._userManager.GetClaimsAsync(OasisUser);
         return Page();
     }
 }

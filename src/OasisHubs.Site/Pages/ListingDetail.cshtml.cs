@@ -36,7 +36,6 @@ public class ListingDetailModel : PageModel {
 
       OasisUser = await _userManager.GetUserAsync(HttpContext.User);
 
-
       Rental = this._dbContext.HubRentals
          .FirstOrDefault(h => h.IsActive && h.ReferenceCode.ToUpper() == ReferenceCode.ToUpper());
 
@@ -70,7 +69,6 @@ public class ListingDetailModel : PageModel {
       // retrieve subscription
       var subscription = await this._stripeClient.V1.Subscriptions.GetAsync(OasisUser.ActiveSubscriptionId);
       if (subscription is not null) {
-
          
          await _usageReportChannel.Writer.WriteAsync(new HubUsageReport(OasisUser.StripeCustomerId, hours));
 

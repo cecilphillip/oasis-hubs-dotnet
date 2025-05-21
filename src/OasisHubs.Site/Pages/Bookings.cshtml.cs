@@ -5,21 +5,20 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using OasisHubs.DbModels;
 
-
 namespace OasisHubs.Site.Pages;
 
 [Authorize]
 public class Bookings : PageModel {
-   private readonly IDbContextFactory<OasisHubsDbContext> _dbContextFactory;
+   private readonly OasisHubsDbContext _dbContext;
    private readonly UserManager<OasisHubsUser> _userManager;
    private readonly ILogger<Bookings> _logger;
 
    public IEnumerable<Booking> UserBookings { get; set; } = default!;
 
-   public Bookings(IDbContextFactory<OasisHubsDbContext> dbContextFactory,
+   public Bookings(OasisHubsDbContext dbContext,
       UserManager<OasisHubsUser> userManager, ILogger<Bookings> logger) {
 
-      this._dbContextFactory = dbContextFactory;
+      this._dbContext = dbContext;
       this._userManager = userManager;
       this._logger = logger;
    }
@@ -32,9 +31,7 @@ public class Bookings : PageModel {
          return RedirectToPage("Error");
       }
 
-      await using var context = await this._dbContextFactory.CreateDbContextAsync();
-
-      UserBookings = await context.Bookings
+      UserBookings = await _dbContext.Bookings
          .Include(b => b.Rental)
          .Include(b => b.Renter)
          .Where(b => b.RenterId == user.Id).ToListAsync();

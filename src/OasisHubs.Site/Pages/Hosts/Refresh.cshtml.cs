@@ -36,7 +36,10 @@ public class Refresh : PageModel {
          RefreshUrl = $"{basePageUri}/hosts/refresh",
          ReturnUrl = $"{basePageUri}/hosts/complete",
          Type = "account_onboarding",
-         Collect = "eventually_due"
+         CollectionOptions = new() {
+            Fields = "eventually_due",
+            FutureRequirements = "include"
+         }
       };
 
       var accountLinkService = new AccountLinkService(_stripeClient);

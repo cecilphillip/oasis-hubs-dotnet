@@ -9,14 +9,14 @@ namespace OasisHubs.Site.Pages;
 
 public class Pricing : PageModel {
    private readonly UserManager<OasisHubsUser> _userManager;
-   private readonly IStripeClient _stripeClient;
+   private readonly StripeClient _stripeClient;
    private readonly LinkGenerator _linkGenerator;
    private readonly ILogger<Pricing> _logger;
    private const string _tierMetaKey = "hub.tier";
 
    public IEnumerable<Product> HubTierListings { get; set; } = [];
 
-   public Pricing(UserManager<OasisHubsUser> userManager, IStripeClient stripeClient,
+   public Pricing(UserManager<OasisHubsUser> userManager, StripeClient stripeClient,
       LinkGenerator linkGenerator, ILogger<Pricing> logger) {
       this._userManager = userManager;
       this._stripeClient = stripeClient;
@@ -25,13 +25,11 @@ public class Pricing : PageModel {
    }
 
    public async Task<IActionResult> OnGetAsync() {
-      var productsService = new ProductService(this._stripeClient);
-
       var options = new ProductListOptions {
          Expand = new() { "data.default_price" }, Active = true
       };
 
-      var products = await productsService.ListAsync(options);
+      var products = await _stripeClient.V1.Products.ListAsync(options);
       if (products.Any()) {
          HubTierListings = products.Where(p => p.Metadata.ContainsKey(_tierMetaKey));
       }
@@ -52,12 +50,10 @@ public class Pricing : PageModel {
       }
 
       var plOptions = new PriceListOptions {
-         LookupKeys = new List<string> { lookupKey, $"{lookupKey}_tiered" }
+         LookupKeys = [lookupKey, $"{lookupKey}_tiered"]
       };
-
-      var priceService = new PriceService(this._stripeClient);
-      var prices = await priceService.ListAsync(plOptions);
-      //TODO: Clean up this query
+      
+      var prices = await _stripeClient.V1.Prices.ListAsync(plOptions);
       var lineItems = prices.Select(p => new SessionLineItemOptions {
          Price = p.Id, Quantity = !p.LookupKey.EndsWith("_tiered") ? 1 : null
       }).ToList();

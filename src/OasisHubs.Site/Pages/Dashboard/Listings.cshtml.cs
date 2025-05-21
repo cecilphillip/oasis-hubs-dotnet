@@ -9,14 +9,14 @@ namespace OasisHubs.Site.Pages.Dashboard;
 public class Listings : PageModel {
    private readonly UserManager<OasisHubsUser> _userManager;
    private readonly ILogger<Listings> _logger;
-   private readonly IDbContextFactory<OasisHubsDbContext> _dbContextFactory;
+   private readonly OasisHubsDbContext _dbContext;
 
    public OasisHubsUser? OasisUser { get; set; }
    public IEnumerable<HubRental> Rentals { get; set; } = [];
 
    public Listings(UserManager<OasisHubsUser> userManager,
-      IDbContextFactory<OasisHubsDbContext> dbContextFactory, ILogger<Listings> logger) {
-      this._dbContextFactory = dbContextFactory;
+      OasisHubsDbContext dbContext, ILogger<Listings> logger) {
+      this._dbContext = dbContext;
       this._userManager = userManager;
       this._logger = logger;
    }
@@ -29,8 +29,7 @@ public class Listings : PageModel {
          return RedirectToPage("/Index");
       }
 
-      await using var context = await this._dbContextFactory.CreateDbContextAsync();
-      Rentals = context.HubRentals
+      Rentals = _dbContext.HubRentals
          .Where(h => h.StripeAccountId == OasisUser.StripeAccountId).ToList();
 
       return Page();
@@ -59,9 +58,8 @@ public class Listings : PageModel {
       _logger.LogInformation("Creating stripe product for {ProductName}", newRental.Title);
 
       // Save a product in the database
-      await using var context = await this._dbContextFactory.CreateDbContextAsync();
-      context.HubRentals.Add(newRental);
-      await context.SaveChangesAsync();
+      _dbContext.HubRentals.Add(newRental);
+      await _dbContext.SaveChangesAsync();
       _logger.LogInformation("HubRental {ProductName} created in database", newRental.Title);
 
       return RedirectToPage("/dashboard/listings");
@@ -77,13 +75,12 @@ public class Listings : PageModel {
    private async Task<IActionResult> UpdateStatusAndReturn(bool activate) {
       var referenceCode = Request.Form["referenceCode"].ToString();
       if (!string.IsNullOrEmpty(referenceCode)) {
-         await using var context = await this._dbContextFactory.CreateDbContextAsync();
-         var rental = context.HubRentals.FirstOrDefault(
+         var rental = _dbContext.HubRentals.FirstOrDefault(
             h => h.ReferenceCode.ToUpper() == referenceCode.ToUpper());
 
          if (rental != null) {
             rental.IsActive = activate;
-            await context.SaveChangesAsync();
+            await _dbContext.SaveChangesAsync();
             this._logger.LogInformation("Product ({ProductID}) has been deactivated", rental.Title);
          }
       }

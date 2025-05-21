@@ -35,17 +35,20 @@ builder.AddProject<Projects.OasisHubs_BackgroundProcessor>("processor")
    .WithReference(redisCache)
    .WithReference(rabbitServer)
    .WaitFor(rabbitServer)
-   .WaitFor(redisCache);
+   .WaitFor(redisCache)
+   .WithReference(database)
+   .WaitFor(database);
 
-// builder.AddProject<Projects.OasisHubs_Site>("mainsite")
-//    // Add references
-//    .WithReference(rabbitServer)
-//    .WithReference(redisCache)
-//    .WithReference(database)
-//    
-//    // Wait for references
-//    .WaitFor(rabbitServer)
-//    .WaitFor(redisCache)
-//    .WaitFor(sqlServer);
+builder.AddProject<Projects.OasisHubs_Site>("mainSite")
+   // Add references
+   .WithReference(rabbitServer)
+   .WithReference(redisCache)
+   .WithReference(database)
+   
+   // Wait for references
+   .WaitFor(database)
+   .WaitFor(rabbitServer)
+   .WaitFor(redisCache)
+   .WaitFor(sqlServer);
 
 builder.Build().Run();
