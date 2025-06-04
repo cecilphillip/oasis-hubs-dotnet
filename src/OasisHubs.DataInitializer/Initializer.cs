@@ -9,7 +9,10 @@ using Stripe.TestHelpers;
 
 namespace OasisHubs.DataInitializer;
 
-public class Initializer(IServiceProvider serviceProvider, IHostApplicationLifetime appLifetime, ILogger<Initializer> logger) : BackgroundService {
+public class Initializer(
+   IServiceProvider serviceProvider,
+   IHostApplicationLifetime appLifetime,
+   ILogger<Initializer> logger) : BackgroundService {
    
    private readonly Faker _faker = new("en_US");
    private const string _actMetaKey = "host.account.id";
@@ -17,30 +20,64 @@ public class Initializer(IServiceProvider serviceProvider, IHostApplicationLifet
 
    private const string _placeHolderDescription =
       "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.";
-   
-   
+
+
    protected override async Task ExecuteAsync(CancellationToken stoppingToken) {
       logger.LogInformation("Seeding database ...");
 
       using var scope = serviceProvider.CreateScope();
       var dbContext = scope.ServiceProvider.GetRequiredService<OasisHubsDbContext>();
       await dbContext.Database.EnsureCreatedAsync(stoppingToken);
-      
+
       var stripeClient = scope.ServiceProvider.GetRequiredService<StripeClient>();
       var userManager = scope.ServiceProvider.GetRequiredService<UserManager<OasisHubsUser>>();
-      
+
       // Create test users with Stripe customers and connected accounts for hosts
       await CreateUsers(stripeClient, userManager);
-      
+
       // Create Stripe usage meter
       await CreateUsageMeter(stripeClient);
-      
+
       // Initialize subscription tiers as Stripe products with pricing configurations
       await CreateHubTierProductsAsync(stripeClient);
+      
+      //  Create transactions to initialize balance
+      await CreateTransactionsAsync(stripeClient);
 
       logger.LogInformation("Seeding completed!");
       appLifetime.StopApplication();
    }
+
+   
+/// <summary>
+/// Creates sample transactions to initialize a balance for testing purposes.
+/// </summary>
+/// <param name="stripeClient">The Stripe client used to create the payment intent.</param>
+/// <returns>A task representing the asynchronous operation.</returns>
+private async Task CreateTransactionsAsync(StripeClient stripeClient) {
+
+   var balance = await stripeClient.V1.Balance.GetAsync();
+   
+   if (balance.Available.Sum(s => s.Amount) > 0) {
+      logger.LogDebug("Skipping transaction creation. Balance is already initialized");
+      return;
+   }
+   
+   var opts = new PaymentIntentCreateOptions {
+      Amount = 3500000, 
+      Currency = "usd",
+      Description = "Filling up the balance for testing",
+      PaymentMethodTypes = ["card"],
+      PaymentMethod = "pm_card_bypassPending",
+      Confirm = true,
+   };
+   
+   for (var i = 0; i < 5; i++) {
+      opts.Metadata = new() { ["test.transaction"] = $"transaction-{i}" };
+      logger.LogDebug("Creating test transaction {TransactionId}", opts.Metadata["test.transaction"]);
+      await stripeClient.V1.PaymentIntents.CreateAsync(opts);
+   }
+}
 
    /// <summary>
    /// Creates multiple users, integrates them with Stripe, and configures additional user properties.
@@ -57,7 +94,7 @@ public class Initializer(IServiceProvider serviceProvider, IHostApplicationLifet
       }
 
       // Host User 1
-      await CreateUser("Cecil Phillip", "cecil@test.com", stripeClient, userManager, true); 
+      await CreateUser("Cecil Phillip", "cecil@test.com", stripeClient, userManager, true);
 
       // Host User 2
       await CreateUser("James Moriarty", "james@test.com", stripeClient, userManager, true);
@@ -66,7 +103,7 @@ public class Initializer(IServiceProvider serviceProvider, IHostApplicationLifet
       await CreateUser("Dorian Gray", "dorian@test.com", stripeClient, userManager, addTestClock: true);
 
       // Customer 2
-      await CreateUser("H. G. Wells", "george@test.com",stripeClient, userManager, addTestClock: true);
+      await CreateUser("H. G. Wells", "george@test.com", stripeClient, userManager, addTestClock: true);
    }
 
 
@@ -80,8 +117,8 @@ public class Initializer(IServiceProvider serviceProvider, IHostApplicationLifet
    /// <param name="addConnectAccount">Optional. Indicates whether a Connect account should be added for the user. Defaults to false.</param>
    /// <param name="addTestClock">Optional. Indicates whether a test clock should be created and attached to the user. Defaults to false.</param>
    /// <returns>A task that represents the asynchronous operation of creating the user with all necessary configurations.</returns>
-   private async Task CreateUser(string name, string email, StripeClient stripeClient, UserManager<OasisHubsUser> userManager, bool addConnectAccount = false, bool addTestClock = false) {
-      
+   private async Task CreateUser(string name, string email, StripeClient stripeClient,
+      UserManager<OasisHubsUser> userManager, bool addConnectAccount = false, bool addTestClock = false) {
       var ccOptions = new CustomerCreateOptions {
          Name = name,
          Email = email,
@@ -109,6 +146,7 @@ public class Initializer(IServiceProvider serviceProvider, IHostApplicationLifet
             "Created test clock ({TestClock}) attached to user ({Username})", newTestClock.Id,
             ccOptions.Name);
       }
+
       // Create a new user and associate it with a customer in stripe 
       var newCustomer = await stripeClient.V1.Customers.CreateAsync(ccOptions);
       var newUser = new OasisHubsUser {
@@ -127,7 +165,7 @@ public class Initializer(IServiceProvider serviceProvider, IHostApplicationLifet
          Metadata = new Dictionary<string, string> { [_customerMetaKey] = newUser.Id }
       };
 
-      
+
       // Create and attach new stripe connected account.
       if (addConnectAccount) {
          await CreateConnectedAccountAsync(stripeClient, userManager, newUser, newCustomer, cuOptions);
@@ -136,7 +174,7 @@ public class Initializer(IServiceProvider serviceProvider, IHostApplicationLifet
       await stripeClient.V1.Customers.UpdateAsync(newCustomer.Id, cuOptions);
    }
 
-   
+
    /// <summary>
    /// Creates a Stripe connected account for a user, updates the user and customer metadata, 
    /// and associates the account with rental hubs.
@@ -147,10 +185,8 @@ public class Initializer(IServiceProvider serviceProvider, IHostApplicationLifet
    /// <param name="newCustomer">The Stripe customer associated with the user.</param>
    /// <param name="cuOptions">The customer update options for adding metadata.</param>
    /// <returns>A task representing the asynchronous operation.</returns>
-   
    private async Task CreateConnectedAccountAsync(StripeClient stripeClient, UserManager<OasisHubsUser> userManager,
-      OasisHubsUser newUser, Customer newCustomer, CustomerUpdateOptions cuOptions)
-   {
+      OasisHubsUser newUser, Customer newCustomer, CustomerUpdateOptions cuOptions) {
       logger.LogInformation("Creating connect account");
 
       // create a connected account
@@ -160,27 +196,20 @@ public class Initializer(IServiceProvider serviceProvider, IHostApplicationLifet
          Country = "US",
          DefaultCurrency = "usd",
          Email = newUser.Email,
-            
          BusinessProfile = new AccountBusinessProfileOptions {
             Name = companyName,
             //https://stripe.com/docs/connect/setting-mcc#list
-            Mcc = "6513", 
+            Mcc = "6513",
             ProductDescription = "Remote work rental space",
             SupportEmail = newUser.Email
          },
-            
          Individual = new() {
             Email = newUser.Email,
             Phone = "0000000000",
             IdNumber = "000000000",
-            Dob = new(){ Day = 1, Month = 1, Year = 1902 },
-            Verification =  new() {
-               Document = new() {
-                  Front = "file_identity_document_success"
-               }
-            }
+            Dob = new() { Day = 1, Month = 1, Year = 1902 },
+            Verification = new() { Document = new() { Front = "file_identity_document_success" } }
          },
-            
          Company = new AccountCompanyOptions {
             Name = companyName,
             Phone = "0000000000",
@@ -193,14 +222,12 @@ public class Initializer(IServiceProvider serviceProvider, IHostApplicationLifet
                Country = "US"
             },
          },
-            
          Controller = new() {
-            StripeDashboard = new() { Type = "express"},
+            StripeDashboard = new() { Type = "express" },
             RequirementCollection = "stripe",
-            Losses = new AccountControllerLossesOptions() {Payments = "application"},
+            Losses = new AccountControllerLossesOptions() { Payments = "application" },
             Fees = new AccountControllerFeesOptions { Payer = "application" },
          },
-            
          Capabilities = new AccountCapabilitiesOptions {
             UsBankAccountAchPayments = new() { Requested = true },
             BankTransferPayments = new() { Requested = true },
@@ -209,7 +236,6 @@ public class Initializer(IServiceProvider serviceProvider, IHostApplicationLifet
             KlarnaPayments = new() { Requested = true },
             Transfers = new() { Requested = true }
          },
-            
          TosAcceptance = new() { ServiceAgreement = "full" },
          Metadata = new Dictionary<string, string> { ["owner.customer.id"] = newCustomer.Id }
       };
@@ -242,9 +268,9 @@ public class Initializer(IServiceProvider serviceProvider, IHostApplicationLifet
       logger.LogInformation("Creating Hubs ...");
       using var scope = serviceProvider.CreateScope();
       var context = scope.ServiceProvider.GetRequiredService<OasisHubsDbContext>();
-      
+
       // Hub Rental #1
-       CreateHubAsync(context,
+      CreateHubAsync(context,
          new HubRental {
             Title = $"Two Room Condo by {companyName}",
             Description = _placeHolderDescription,
@@ -258,7 +284,7 @@ public class Initializer(IServiceProvider serviceProvider, IHostApplicationLifet
          });
 
       // Hub Rental #2
-       CreateHubAsync(context,
+      CreateHubAsync(context,
          new HubRental {
             Title = $"Cute Ranch with huge yard by {companyName}",
             Description = _placeHolderDescription,
@@ -272,7 +298,7 @@ public class Initializer(IServiceProvider serviceProvider, IHostApplicationLifet
          });
 
       // Hub Rental #3
-       CreateHubAsync(context,
+      CreateHubAsync(context,
          new HubRental {
             Title = $"The Canopy House by {companyName}",
             Description = _placeHolderDescription,
@@ -286,7 +312,7 @@ public class Initializer(IServiceProvider serviceProvider, IHostApplicationLifet
          });
 
       // Hub Rental #4
-       CreateHubAsync(context,
+      CreateHubAsync(context,
          new HubRental {
             Title = $"Co-Working Desk by {companyName}",
             Description = _placeHolderDescription,
@@ -300,7 +326,7 @@ public class Initializer(IServiceProvider serviceProvider, IHostApplicationLifet
          });
 
       // Hub Rental #5
-       CreateHubAsync(context,
+      CreateHubAsync(context,
          new HubRental {
             Title = $"Single Bedroom Apartment by {companyName}",
             Description = _placeHolderDescription,
@@ -312,12 +338,11 @@ public class Initializer(IServiceProvider serviceProvider, IHostApplicationLifet
             StripeAccountId = connectAccountId,
             ReferenceCode = ReferenceCodeGenerator.GetUniqueKey()
          });
-      
+
       await context.SaveChangesAsync();
    }
 
    private void CreateHubAsync(OasisHubsDbContext context, HubRental rental) {
-      
       ArgumentNullException.ThrowIfNull(rental);
       // Add a product in the database
       context.HubRentals.Add(rental);
@@ -326,12 +351,11 @@ public class Initializer(IServiceProvider serviceProvider, IHostApplicationLifet
 
    private async Task CreateHubTierProductsAsync(StripeClient stripeClient) {
       logger.LogInformation("Creating product tiers ...");
-      
-      var options = new ProductListOptions {Limit = 1};
+
+      var options = new ProductListOptions { Limit = 1 };
       var existingProducts = await stripeClient.V1.Products.ListAsync(options);
-      
-      if (existingProducts.Any(p => p.Metadata.ContainsKey("hub.tier")))
-      {
+
+      if (existingProducts.Any(p => p.Metadata.ContainsKey("hub.tier"))) {
          logger.LogInformation("Skipping product creation. Existing hub tier products found");
          return;
       }
@@ -361,7 +385,6 @@ public class Initializer(IServiceProvider serviceProvider, IHostApplicationLifet
    /// <param name="stripeClient">The Stripe client instance.</param>
    private async Task CreateHubTierAsync(string title, string description, long hourlyUnitPrice,
       IEnumerable<string> features, string priceLookupPrefix, string imageFileName, StripeClient stripeClient) {
-      
       // locate and upload image
       var imagePath = Path.Combine(Directory.GetCurrentDirectory(), "images", imageFileName);
       await using var stream = System.IO.File.OpenRead(imagePath);
@@ -419,7 +442,7 @@ public class Initializer(IServiceProvider serviceProvider, IHostApplicationLifet
          LookupKey = $"{priceLookupPrefix}_usd_tiered",
          Currency = "usd",
          Tiers = [
-            new() { UnitAmount = 0, UpTo = 10 }, 
+            new() { UnitAmount = 0, UpTo = 10 },
             new() { UnitAmount = hourlyUnitPrice / 10, UpTo = PriceTierUpTo.Inf }
          ],
          Recurring = new PriceRecurringOptions { Interval = "month", UsageType = "metered", Meter = meter.Id },
@@ -430,11 +453,10 @@ public class Initializer(IServiceProvider serviceProvider, IHostApplicationLifet
       newProductPrice = await stripeClient.V1.Prices.CreateAsync(priceCreateOptions);
       logger.LogDebug("Metered price ({PriceId}) created ", newProductPrice.Id);
    }
-   
+
    private async Task CreateUsageMeter(StripeClient stripeClient) {
-    
       logger.LogInformation("Attempting meter creation");
-      
+
       var meter = await GetExistingMeterAsync(stripeClient);
       if (meter is null) {
          var meterCreateOptions = new MeterCreateOptions {
@@ -445,23 +467,21 @@ public class Initializer(IServiceProvider serviceProvider, IHostApplicationLifet
             CustomerMapping =
                new MeterCustomerMappingOptions { Type = "by_id", EventPayloadKey = "stripe_customer_id", },
          };
-         
+
          meter = await stripeClient.V1.Billing.Meters.CreateAsync(meterCreateOptions);
          logger.LogInformation("New meter created ({MeterId})", meter.Id);
       }
       else {
-         logger.LogInformation("Existing meter found for event ({MeterEvent}. Skipping meter creation)", meter.EventName);
+         logger.LogInformation("Existing meter found for event ({MeterEvent}. Skipping meter creation)",
+            meter.EventName);
       }
    }
-   
-   private async Task<Meter?> GetExistingMeterAsync(StripeClient stripeClient)
-   {
-      var existingMeters = await  stripeClient.V1.Billing.Meters.ListAsync(new () { Limit = 3 });
 
-      foreach (var meter in existingMeters)
-      {
-         if(meter.EventName == AppConstants.ReportUsageEventName)
-         {
+   private async Task<Meter?> GetExistingMeterAsync(StripeClient stripeClient) {
+      var existingMeters = await stripeClient.V1.Billing.Meters.ListAsync(new() { Limit = 3 });
+
+      foreach (var meter in existingMeters) {
+         if (meter.EventName == AppConstants.ReportUsageEventName) {
             return meter;
          }
       }
