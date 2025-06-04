@@ -9,11 +9,11 @@ namespace OasisHubs.Site.Pages.Hosts;
 
 public class Refresh : PageModel {
    private readonly UserManager<OasisHubsUser> _userManager;
-   private readonly IStripeClient _stripeClient;
+   private readonly StripeClient _stripeClient;
    private readonly LinkGenerator _linkGenerator;
    private readonly ILogger<Refresh> _logger;
 
-   public Refresh(UserManager<OasisHubsUser> userManager, IStripeClient stripeClient,
+   public Refresh(UserManager<OasisHubsUser> userManager, StripeClient stripeClient,
       LinkGenerator linkGenerator, ILogger<Refresh> logger) {
       this._userManager = userManager;
       this._stripeClient = stripeClient;

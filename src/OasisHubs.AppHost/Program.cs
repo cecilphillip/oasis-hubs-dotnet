@@ -2,8 +2,8 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 var sqlServerPassword = builder.AddParameter("sqlServerPassword", true);
 var sqlServer = builder.AddSqlServer("sqlServer", sqlServerPassword, 1433)
-   .WithDataBindMount(".temp/mssql/data")
-   .WithLifetime(ContainerLifetime.Persistent);
+   //.WithLifetime(ContainerLifetime.Persistent)
+   .WithDataBindMount(".temp/mssql/data");
 
 var database = sqlServer.AddDatabase("OasisHubsDb");
 
@@ -22,7 +22,6 @@ var redisCache = builder.AddRedis("redisCache", 6379, redisPwd)
    .WithRedisInsight()
    .WithLifetime(ContainerLifetime.Persistent);
 
-
 var stripeDefaultApiKey = builder.AddParameter("stripeSecretKey", true);
 
 // Projects
@@ -40,12 +39,10 @@ builder.AddProject<Projects.OasisHubs_BackgroundProcessor>("processor")
    .WaitFor(database);
 
 builder.AddProject<Projects.OasisHubs_Site>("mainSite")
-   // Add references
    .WithReference(rabbitServer)
    .WithReference(redisCache)
    .WithReference(database)
    
-   // Wait for references
    .WaitFor(database)
    .WaitFor(rabbitServer)
    .WaitFor(redisCache)

@@ -65,7 +65,7 @@ public class Pricing : PageModel {
          LineItems = lineItems,
          Mode = "subscription",
          AutomaticTax = new SessionAutomaticTaxOptions { Enabled = true },
-         SuccessUrl = $"{basePageUri}/PaymentComplete?session_id={{CHECKOUT_SESSION_ID}}",
+         SuccessUrl = $"{basePageUri}PaymentComplete?session_id={{CHECKOUT_SESSION_ID}}",
          CancelUrl = $"{basePageUri}",
          ConsentCollection = new() { Promotions = "auto" },
          AllowPromotionCodes = true

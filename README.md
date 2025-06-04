@@ -7,8 +7,7 @@
 The sample application contained in this repository aims to serve as a practical reference on how to
 integrate Stripe Connect and metered billing into an ASP.NET Core application. It addresses core
 concerns such as onboarding Express accounts, handling webhooks out of process, working with tiered
-pricing,
-subscriptions, invoices, test clocks and more.
+pricing, subscriptions, invoices, test clocks, and more.
 
 The use case is centered around Oasis Hubs, a workspace booking platform focused on remote workers.
 Customers are able to sign up for a monthly subscription that gives them access to book one of the
@@ -21,14 +20,14 @@ Connect Express accounts.
 
 ## Requirements
 
-* [.NET SDK 7.0+](https://get.dot.net)
+* [.NET SDK 9.0+](https://get.dot.net)
 * [Docker Desktop](https://www.docker.com/products/docker-desktop)
 * [Stripe Account](https://dashboard.stripe.com/register)
 * [Stripe CLI](https://stripe.com/docs/stripe-cli)
 
 ## [Container Dependencies](.compose/compose.yaml)
 
-* [MS SQl Server](https://github.com/microsoft/mssql-docker/tree/master) - Relational storage for
+* [MS SQL Server](https://github.com/microsoft/mssql-docker/tree/master) - Relational storage for
   user credentials, hubs, and bookings
 * [Rabbitmq](https://github.com/docker-library/rabbitmq) - Message broker for handling webhook
   events
@@ -101,12 +100,6 @@ Navigate to http://localhost:5000 in your browser.
 
 ## Useful Commands
 
-Run container dependencies under the oasishubs project name
-
-```shell
-docker compose -f .compose/compose.yaml up 
-```
-
 Provision the database and seed demo customers in Stripe
 
 ```shell
@@ -139,14 +132,12 @@ stripe listen --forward-to http://localhost:5000/api/webhooks/stripe/platform --
 
 ## Demo Users
 
-| Name                 | Email            | Password | Type     | Test Clock |
-|----------------------|------------------|----------|----------|------------|
-| Cecil Phillip        | cecil@test.com   | Test     | Host     | No         |
-| Phil Host            | phil@test.com    | Test     | Host     | No         |
-| Jonathan Smith       | jon@test.com     | Test     | Customer | No         |
-| Jaime Renter         | jaime@test.com   | Test     | Customer | No         |
-| Benjamin Westminster | ben@test.com     | Test     | Customer | Yes        |
-| Chronos Titan        | chronos@test.com | Test     | Customer | Yes        |
+| Name                | Email           | Password | Type     | Test Clock |
+|---------------------|-----------------|----------|----------|------------|
+| Cecil Phillip       | cecil@test.com  | test     | Host     | No         |
+| James Moriarty      | james@test.com  | test     | Host     | No         |
+| Dorian Gray         | dorian@test.com | test     | Customer | Yes        |
+| H. G. Wells         | geroge@test.com | test     | Customer | Yes        |
 
 ## Resources
 * [Stripe Connect](https://stripe.com/docs/connect)
@@ -160,3 +151,8 @@ Image Source [Unsplash](https://unsplash.com/photos/man-sitting-on-concrete-bric
 
 The MIT License (MIT) 2023 - [Cecil Phillip](https://twitter.com/cecilphillip). Please have a look
 at the [LICENSE.md](LICENSE) for more details.
+
+Notes
+- Create portal
+- add manual payouts
+- look up sqlserver 2025

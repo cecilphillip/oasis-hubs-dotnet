@@ -17,21 +17,21 @@
    <td class="max-w-xs truncate px-6 py-4 text-left text-sm whitespace-nowrap text-gray-500 uppercase">
       @Model.GuestBooking.Rental.Title
    </td>
-   <td class="px-6 py-4 text-right text-sm whitespace-nowrap text-gray-500 uppercase">
+   <td class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-500 uppercase">
       <span>
          @Model.GuestBooking.ReservedDateUtc.ToLocalTime().ToString("D")
       </span>
    </td>
-   <td class="px-6 py-4 text-right text-sm whitespace-nowrap text-gray-500">@Model.GuestBooking.Hours</td>
+   <td class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-500">@Model.GuestBooking.Hours</td>
    <td class="t-status hidden px-6 py-4 text-sm whitespace-nowrap text-gray-500 md:block">
       <span
          class="t-refunded inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium @GetTierBackground(Model.GuestBooking.Rental.HubTier) text-gray-500 capitalize">
          @Model.GuestBooking.Rental.HubTier
       </span>
    </td>
-   <td class="px-6 py-4 text-right text-sm whitespace-nowrap text-gray-500">
+   <td class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-500">
       <span
-         class="px-6 py-4 text-right text-sm whitespace-nowrap text-gray-500 uppercase">
+         class="text-sm whitespace-nowrap text-gray-500 uppercase">
          @Model.GuestBooking.Rental.Location
       </span>
    </td>

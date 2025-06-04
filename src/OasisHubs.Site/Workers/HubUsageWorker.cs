@@ -7,7 +7,7 @@ using Stripe.Billing;
 namespace OasisHubs.Site.Workers;
 
 public class HubUsageWorker(Channel<HubUsageReport> hubUsageChannel, IServiceProvider provider) : BackgroundService {
-   private const int _batchSize = 10;
+   private const int _batchSize = 1;
    private readonly ConcurrentBag<HubUsageReport> _reportedUsage = new();
 
    protected override async Task ExecuteAsync(CancellationToken stoppingToken) {

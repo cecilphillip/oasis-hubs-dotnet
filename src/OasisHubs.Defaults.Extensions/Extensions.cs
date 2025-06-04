@@ -62,9 +62,6 @@ public static class Extensions {
                )
                .AddHttpClientInstrumentation();
          });
-         // .WithLogging(logging => {
-         //    logging.AddConsoleExporter();
-         // })
       
       var useOtlpExporter = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
 

@@ -1,12 +1,11 @@
-using Paramore.Brighter;
-using Paramore.Brighter.MessagingGateway.RMQ;
-using Paramore.Brighter.ServiceActivator.Extensions.DependencyInjection;
-using Paramore.Brighter.ServiceActivator.Extensions.Hosting;
-
 using OasisHubs.DbModels;
 using OasisHubs.Defaults.Extensions;
 using OasisHubs.Defaults.Extensions.Messaging;
+using Paramore.Brighter;
 using Paramore.Brighter.Extensions.DependencyInjection;
+using Paramore.Brighter.MessagingGateway.RMQ;
+using Paramore.Brighter.ServiceActivator.Extensions.DependencyInjection;
+using Paramore.Brighter.ServiceActivator.Extensions.Hosting;
 using RabbitMQ.Client;
 
 namespace OasisHubs.BackgroundProcessor;
