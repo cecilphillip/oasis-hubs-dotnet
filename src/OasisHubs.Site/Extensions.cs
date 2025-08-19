@@ -33,12 +33,12 @@ internal static class Extensions {
       app.UseAuthentication();
       app.UseAuthorization();
 
+      app.MapDefaultEndpoints();
       app.MapControllers();
       app.MapRazorPages();
 
       return app;
    }
-   
 
    private static IServiceCollection AddCoreServices(this IServiceCollection services,
       IConfiguration configuration) {
@@ -142,7 +142,7 @@ internal static class Extensions {
       return services;
    }
 
-   private static IServiceCollection AddRazorAppServices(this IServiceCollection services) {
+   private static void AddRazorAppServices(this IServiceCollection services) {
       services.Configure<RouteOptions>(options => {
          options.LowercaseQueryStrings = true;
          options.LowercaseUrls = true;
@@ -154,7 +154,5 @@ internal static class Extensions {
       });
 
       services.AddControllers();
-      
-      return services;
    }
 }

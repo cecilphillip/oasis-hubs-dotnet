@@ -10,6 +10,7 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Paramore.Brighter;
+using ZiggyCreatures.Caching.Fusion;
 
 namespace Microsoft.Extensions.Hosting;
 
@@ -26,9 +27,21 @@ public static class Extensions {
          http.AddStandardResilienceHandler();
          http.AddServiceDiscovery();
       });
-      
-      
 
+      builder.AddRedisDistributedCache(connectionName: "redisCache");
+
+      builder.Services.AddFusionCache()
+         .WithDefaultEntryOptions(opts =>
+         {
+            opts.IsFailSafeEnabled = true;
+            opts.FailSafeMaxDuration = TimeSpan.FromMinutes(5);
+            opts.FailSafeThrottleDuration = TimeSpan.FromSeconds(5);
+            opts.AllowBackgroundDistributedCacheOperations = true;
+            opts.Duration = TimeSpan.FromMinutes(2);
+         })
+         .WithSystemTextJsonSerializer()
+         .WithRegisteredDistributedCache();
+      
       return builder;
    }
    public static OpenTelemetryBuilder ConfigureOpenTelemetry<TBuilder>(this TBuilder builder, string serviceName)

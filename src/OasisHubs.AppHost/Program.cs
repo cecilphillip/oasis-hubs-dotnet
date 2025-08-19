@@ -23,6 +23,8 @@ var redisCache = builder.AddRedis("redisCache", 6379, redisPwd)
    .WithLifetime(ContainerLifetime.Persistent);
 
 var stripeDefaultApiKey = builder.AddParameter("stripeSecretKey", true);
+var stripeDefaultPublicKey = builder.AddParameter("stripePublicKey", true);
+var stripeDefaultWebhookSecret = builder.AddParameter("stripeWebhookSecret", true);
 
 // Projects
 builder.AddProject<Projects.OasisHubs_DataInitializer>("dataInitializer")
@@ -31,6 +33,9 @@ builder.AddProject<Projects.OasisHubs_DataInitializer>("dataInitializer")
    .WaitFor(database);
 
 builder.AddProject<Projects.OasisHubs_BackgroundProcessor>("processor")
+   .WithEnvironment("Stripe__Default__ApiKey", stripeDefaultApiKey)
+   .WithEnvironment("Stripe__Default__PublicKey", stripeDefaultPublicKey)
+   .WithEnvironment("Stripe__Default__WebhookSecret", stripeDefaultWebhookSecret)
    .WithReference(redisCache)
    .WithReference(rabbitServer)
    .WaitFor(rabbitServer)
@@ -39,6 +44,9 @@ builder.AddProject<Projects.OasisHubs_BackgroundProcessor>("processor")
    .WaitFor(database);
 
 builder.AddProject<Projects.OasisHubs_Site>("mainSite")
+   .WithEnvironment("Stripe__Default__ApiKey", stripeDefaultApiKey)
+   .WithEnvironment("Stripe__Default__PublicKey", stripeDefaultPublicKey)
+   .WithEnvironment("Stripe__Default__WebhookSecret", stripeDefaultWebhookSecret)
    .WithReference(rabbitServer)
    .WithReference(redisCache)
    .WithReference(database)

@@ -36,7 +36,7 @@ Connect Express accounts.
 ## Running the demo
 
 [!CAUTION]
-> This sample is meant to be run in TEST MODE in your Stripe account!
+> This sample is meant to be run in a sandbox in your Stripe account!
 
 **Step 0**: <br /> 
 Before running the demo, make sure you sign up for a Stripe
@@ -50,26 +50,22 @@ You will also need to activate the test link for the [Customer Portal](https://d
 **Step 1**: <br />
 Retrieve the Stripe API keys from the Developers area of the Dashboard and store them in
 the `Stripe` section
-of the [appsettings.Development.json](./src/OasisHubs.Site/appsettings.Development.json)
+of the [appsettings.json](./src/OasisHubs.AppHost/appsettings.json)
 configuration file.
 
 **Step 2**: <br />
-Start up the container dependencies using the [compose.yaml](.compose/compose.yaml)
-file.
+Start the entire application using AppHost. Run the `dotnet run` command from the [OasisHubs.AppHost](src/OasisHubs.AppHost) directory.
+Alternatively, you can run the application using the [Aspire CLI](https://learn.microsoft.com/en-us/dotnet/aspire/cli/overview) with `aspire run` command from the root of the repository.
+
+```shell
 
 **Step 3**: <br />
-Load test data with the `dotnet run data seed` command. This will populate the database tables
-as well as the Stripe account with demo data.
-
-**Step 4**: <br />
-Run the application using the `dotnet run serve` command from the [OasisHubs.Site](src/OasisHubs.Site) directory.
-
-**Step 5**: <br />
 In a new terminal window, run the following command to forward Stripe events to the application
 running locally.
 ```shell
 stripe listen --forward-to http://localhost:5000/api/webhooks/stripe/platform --forward-connect-to  http://localhost:5000/api/webhooks/stripe/connect
 ```
+> Use port 7081 for HTTPS and port 5000 for HTTP.
 
 **Step 6**: <br />
 Navigate to http://localhost:5000 in your browser. 
@@ -98,38 +94,6 @@ Navigate to http://localhost:5000 in your browser.
 * Click on "Advance time", move the clock forward by a month or more
 * Observe how the invoicing integration reacts.
 
-## Useful Commands
-
-Provision the database and seed demo customers in Stripe
-
-```shell
-dotnet run data seed
-```
-
-Drop the demo database. **This does not purge records in the associated Stripe account**
-
-```shell
-dotnet run data drop
-```
-
-Run the application
-
-```shell
-dotnet run serve
-```
-
-Run the application with hot reload
-
-```shell
-dotnet watch -- run serve
-```
-
-Forward Stripe events to the local server
-
-```shell
-stripe listen --forward-to http://localhost:5000/api/webhooks/stripe/platform --forward-connect-to  http://localhost:5000/api/webhooks/stripe/connect
-```
-
 ## Demo Users
 
 | Name                | Email           | Password | Type     | Test Clock |
@@ -149,10 +113,5 @@ Image Source [Unsplash](https://unsplash.com/photos/man-sitting-on-concrete-bric
 
 ## License
 
-The MIT License (MIT) 2023 - [Cecil Phillip](https://twitter.com/cecilphillip). Please have a look
+The MIT License (MIT) 2025 - [Cecil Phillip](https://twitter.com/cecilphillip). Please have a look
 at the [LICENSE.md](LICENSE) for more details.
-
-Notes
-- Create portal
-- add manual payouts
-- look up sqlserver 2025

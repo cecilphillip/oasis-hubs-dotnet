@@ -7,7 +7,6 @@ namespace OasisHubs.Site.Pages;
 
 public class SignOutModel : PageModel
 {
-
     private readonly SignInManager<OasisHubsUser> _signInManager;
     private readonly ILogger<SignOutModel> _logger;
 
