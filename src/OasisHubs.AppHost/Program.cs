@@ -1,16 +1,15 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
-var sqlServerPassword = builder.AddParameter("sqlServerPassword", true);
-var sqlServer = builder.AddSqlServer("sqlServer", sqlServerPassword, 1433)
+var postgres = builder.AddPostgres("postgres")
+   .WithPgAdmin()
    //.WithLifetime(ContainerLifetime.Persistent)
-   .WithDataBindMount(".temp/mssql/data");
+   .WithDataBindMount(".temp/postgres/data");
 
-var database = sqlServer.AddDatabase("OasisHubsDb");
+var database = postgres.AddDatabase("OasisHubsDb");
 
 var rabbitPwd = builder.AddParameter("rabbitmqPassword", true);
 var rabbitUsr = builder.AddParameter("rabbitmqUsername", true);
 var rabbitServer = builder.AddRabbitMQ("rabbitServer", rabbitUsr, rabbitPwd, 5672)
-   //.WithEnvironment("RABBITMQ_DEFAULT_VHOST", "oasis")
    .WithBindMount(".config/rabbitmq/rabbitmq_enabled_plugins", "/etc/rabbitmq/enabled_plugins")
    .WithManagementPlugin(15672)
    .WithLifetime(ContainerLifetime.Persistent);
@@ -53,7 +52,6 @@ builder.AddProject<Projects.OasisHubs_Site>("mainSite")
    
    .WaitFor(database)
    .WaitFor(rabbitServer)
-   .WaitFor(redisCache)
-   .WaitFor(sqlServer);
+   .WaitFor(redisCache);
 
 builder.Build().Run();

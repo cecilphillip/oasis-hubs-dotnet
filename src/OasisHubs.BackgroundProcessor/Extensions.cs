@@ -13,7 +13,7 @@ namespace OasisHubs.BackgroundProcessor;
 internal static class Extensions {
    public static WebApplicationBuilder ConfigureAppServices(this WebApplicationBuilder builder) {
 
-      builder.AddSqlServerDbContext<OasisHubsDbContext>("OasisHubsDb");
+      builder.AddNpgsqlDbContext<OasisHubsDbContext>("OasisHubsDb");
       builder.AddMessagingServices();
       builder.Services.AddStripe();
       

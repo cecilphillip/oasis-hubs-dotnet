@@ -17,7 +17,7 @@ namespace OasisHubs.Site;
 internal static class Extensions {
    public static void ConfigureAppServices(this WebApplicationBuilder builder) {
       
-      builder.AddSqlServerDbContext<OasisHubsDbContext>("OasisHubsDb");
+      builder.AddNpgsqlDbContext<OasisHubsDbContext>("OasisHubsDb");
       builder.Services.AddCoreServices(builder.Configuration)
          .AddMessagingServices(builder.Configuration)
          .AddAuthServices()

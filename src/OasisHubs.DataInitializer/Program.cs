@@ -8,7 +8,7 @@ builder.AddServiceDefaults();
 builder.ConfigureOpenTelemetry("initializer");
 builder.AddDefaultHealthChecks();
 
-builder.AddSqlServerDbContext<OasisHubsDbContext>("OasisHubsDb");
+builder.AddNpgsqlDbContext<OasisHubsDbContext>("OasisHubsDb");
 
 builder.Services.AddIdentity<OasisHubsUser, IdentityRole>(options => {
       options.User.RequireUniqueEmail = true;
