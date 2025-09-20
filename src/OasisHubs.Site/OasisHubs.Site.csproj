@@ -7,15 +7,15 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Aspire.Microsoft.EntityFrameworkCore.SqlServer" Version="9.4.1" />
+    <PackageReference Include="Aspire.Microsoft.EntityFrameworkCore.SqlServer" Version="9.4.2" />
     <PackageReference Include="Bogus" Version="35.6.3" />
-    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="9.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="9.0.9" />
     <PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="9.0.0" />
-    <PackageReference Include="Paramore.Brighter.Extensions.DependencyInjection" Version="9.9.10" />
-    <PackageReference Include="Paramore.Brighter.MessagingGateway.RMQ" Version="9.9.10" />
-    <PackageReference Include="Paramore.Brighter.ServiceActivator" Version="9.9.10" />
-    <PackageReference Include="Paramore.Brighter.ServiceActivator.Extensions.DependencyInjection" Version="9.9.10" />
-    <PackageReference Include="Paramore.Brighter.ServiceActivator.Extensions.Hosting" Version="9.9.10" />
+    <PackageReference Include="Paramore.Brighter.Extensions.DependencyInjection" Version="9.9.12" />
+    <PackageReference Include="Paramore.Brighter.MessagingGateway.RMQ" Version="9.9.12" />
+    <PackageReference Include="Paramore.Brighter.ServiceActivator" Version="9.9.12" />
+    <PackageReference Include="Paramore.Brighter.ServiceActivator.Extensions.DependencyInjection" Version="9.9.12" />
+    <PackageReference Include="Paramore.Brighter.ServiceActivator.Extensions.Hosting" Version="9.9.12" />
     <PackageReference Include="Stripe.Extensions.AspNetCore" Version="0.2.0" />
   </ItemGroup>
 
