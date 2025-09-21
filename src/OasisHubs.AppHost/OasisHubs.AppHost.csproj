@@ -12,12 +12,11 @@
     <ItemGroup>
         <PackageReference Include="Aspire.Hosting.AppHost" Version="9.4.2" />
         <PackageReference Include="Aspire.Hosting.PostgreSQL" Version="9.4.2" />
-        <PackageReference Include="Aspire.Hosting.RabbitMQ" Version="9.4.2" />
         <PackageReference Include="Aspire.Hosting.Redis" Version="9.4.2" />              
+        <PackageReference Include="InfinityFlow.Aspire.Temporal" Version="0.7.0" />              
     </ItemGroup>
 
     <ItemGroup>
-      <Content Include=".config\rabbitmq\rabbitmq_enabled_plugins" />
       <Content Include=".config\redis\redis.conf" />
     </ItemGroup>
 
