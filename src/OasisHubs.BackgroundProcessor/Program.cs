@@ -1,19 +1,21 @@
-using Microsoft.Extensions.Diagnostics.HealthChecks;
 using OasisHubs.BackgroundProcessor;
-using Paramore.Brighter.ServiceActivator.Extensions.Diagnostics.HealthChecks;
+using Temporalio.Extensions.OpenTelemetry;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
-builder.ConfigureOpenTelemetry("processor") ;
-builder.AddDefaultHealthChecks()
-   .AddCheck<BrighterServiceActivatorHealthCheck>("Brighter", HealthStatus.Unhealthy);
+builder.AddDefaultHealthChecks();
+
+builder.ConfigureOpenTelemetry("processor")
+   .WithTracing(tracing => {
+      tracing.AddSource(
+         TracingInterceptor.ClientSource.Name,
+         TracingInterceptor.WorkflowsSource.Name,
+         TracingInterceptor.ActivitiesSource.Name);
+   });
 
 builder.ConfigureAppServices();
 
 var app = builder.Build();
-
-app.UseHttpsRedirection();
 app.MapDefaultEndpoints();
-
 app.Run();
