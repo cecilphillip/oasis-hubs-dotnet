@@ -9,7 +9,6 @@ using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
-using Paramore.Brighter;
 using ZiggyCreatures.Caching.Fusion;
 
 namespace Microsoft.Extensions.Hosting;
@@ -122,7 +121,7 @@ public static class Extensions {
                };
 
                context.Response.ContentType = "application/json";
-               await context.Response.WriteAsync(JsonSerializer.Serialize(content, JsonSerialisationOptions.Options));
+               await context.Response.WriteAsync(JsonSerializer.Serialize(content, JsonSerializerOptions.Web));
             }
          });
 

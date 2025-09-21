@@ -1,18 +1,28 @@
-﻿using OasisHubs.Defaults.Extensions.Messaging;
-using Paramore.Brighter;
+﻿using OasisHubs.Defaults.Extensions;
+using OasisHubs.Workflows;
+using Stripe;
 using Stripe.Extensions.AspNetCore;
+using Temporalio.Client;
 
 namespace OasisHubs.Site.Webhooks;
 
-public class ConnectWebhookHandler(IAmACommandProcessor commandProcessor, StripeWebhookContext context)
+public class ConnectWebhookHandler(ITemporalClient temporalClient, StripeWebhookContext context)
    : StripeWebhookHandler<ConnectWebhookHandler>(context) {
+   public override async Task OnAccountUpdatedAsync(Event evt) {
+      var updatedAccount = (evt.Data.Object as Account)!;
 
-   public override async Task OnAccountUpdatedAsync(Stripe.Event evt) {
-      var updatedAccount = (evt.Data.Object as Stripe.Account)!;
-      
       if (updatedAccount is { DetailsSubmitted: true, ChargesEnabled: true }) {
          this.Logger.LogDebug("Activating host account ({AccountId})", updatedAccount.Id);
-         await commandProcessor.PostAsync(new ActivateHostAccountCommand(updatedAccount));
+
+         var hostAccountData = new SlimAccount(updatedAccount.Id, updatedAccount.Email,
+            updatedAccount.DetailsSubmitted, updatedAccount.ChargesEnabled,
+            updatedAccount.Metadata.GetValueOrDefault("owner.customer.id", string.Empty));
+
+         await temporalClient.StartWorkflowAsync<ActivateHostWorkflow>(w => w.RunAsync(hostAccountData),
+            new() {
+               Id = $"oasis-activate-host-{Guid.NewGuid():N}", 
+               TaskQueue = AppConstants.TemporalTaskQueue
+            });
       }
    }
 }

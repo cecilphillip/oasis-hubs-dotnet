@@ -5,12 +5,8 @@ using OasisHubs.DbModels;
 using OasisHubs.Defaults.Extensions;
 using OasisHubs.Site.Policies;
 using OasisHubs.Site.Workers;
-using Paramore.Brighter;
-using Paramore.Brighter.Extensions.DependencyInjection;
-using Paramore.Brighter.MessagingGateway.RMQ;
-using RabbitMQ.Client;
+using Temporalio.Extensions.OpenTelemetry;
 using ZiggyCreatures.Caching.Fusion;
-using Channel = System.Threading.Channels.Channel;
 
 namespace OasisHubs.Site;
 
@@ -18,8 +14,16 @@ internal static class Extensions {
    public static void ConfigureAppServices(this WebApplicationBuilder builder) {
       
       builder.AddNpgsqlDbContext<OasisHubsDbContext>("OasisHubsDb");
+
+      var temporalConnectionString = builder.Configuration.GetConnectionString("temporal") ?? "localhost:7233";
+      builder.Services
+         .AddTemporalClient(opts => {
+            opts.TargetHost = temporalConnectionString;
+            opts.Namespace = AppConstants.TemporalNamespace;
+            opts.Interceptors = [new TracingInterceptor()];
+         });
+      
       builder.Services.AddCoreServices(builder.Configuration)
-         .AddMessagingServices(builder.Configuration)
          .AddAuthServices()
          .AddRazorAppServices();
    }
@@ -83,46 +87,6 @@ internal static class Extensions {
       return services;
    }
 
-   private static IServiceCollection AddMessagingServices(this IServiceCollection services,
-      IConfiguration configuration) {
-      
-      var rabbitConnectionString = configuration.GetConnectionString("rabbitServer");
-      if (rabbitConnectionString is null)
-         throw new Exception("RabbitMQ Connection information missing");
-
-      var rmqMessagingGatewayConnection = new RmqMessagingGatewayConnection {
-         Name = "OasisHubsRMQConnection",
-         AmpqUri = new AmqpUriSpecification(new Uri(rabbitConnectionString)),
-         //https://www.rabbitmq.com/tutorials/amqp-concepts.html#exchange-direct
-         Exchange = new Exchange(MessagingConstants.DEFAULT_EXCHANGE, ExchangeType.Direct, true),
-         DeadLetterExchange =
-            new Exchange(MessagingConstants.DEFAULT_DLQ_EXCHANGE, ExchangeType.Direct, true),
-         PersistMessages = true
-      };
-
-      // Configure command processor
-      services.AddBrighter()
-         .UseInMemoryOutbox()
-         .UseExternalBus(new RmqProducerRegistryFactory(
-            rmqMessagingGatewayConnection,
-            [
-               new RmqPublication {
-                  Topic = new RoutingKey(MessagingConstants.HOST_UPDATED_TOPIC),
-                  MakeChannels = OnMissingChannel.Create
-               },
-               new RmqPublication {
-                  Topic = new RoutingKey(MessagingConstants.SUBSCRIPTION_ACTIVATED_TOPIC),
-                  MakeChannels = OnMissingChannel.Create
-               },
-               new RmqPublication {
-                  Topic = new RoutingKey(MessagingConstants.FUNDS_TRANSFER_TOPIC),
-                  MakeChannels = OnMissingChannel.Create
-               }
-            ]).Create())
-         .AutoFromAssemblies();
-
-      return services;
-   }
 
    private static IServiceCollection AddAuthServices(this IServiceCollection services) {
       services.AddAuthorizationBuilder()

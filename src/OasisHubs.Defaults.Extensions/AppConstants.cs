@@ -9,6 +9,9 @@ public static class AppConstants {
       public const string ReportUsageEventName = "hub_usage";
       public const string ReportUsageEventValue = "hours";
       public const string ReportUsageEventCustomer = "stripe_customer_id";
+
+      public const string TemporalNamespace = "OasisHubs";
+      public const string TemporalTaskQueue = "oasis-hubs-task-queue";
 }
 
 public record HubUsageReport(string CustomerId, int Usage);
