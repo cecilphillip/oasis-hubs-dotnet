@@ -17,6 +17,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OasisHubs.DbModels", "src\O
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OasisHubs.BackgroundProcessor", "src\OasisHubs.BackgroundProcessor\OasisHubs.BackgroundProcessor.csproj", "{261B8319-68E9-47E0-A252-CE14D3CF18A5}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OasisHubs.Workflows", "src\OasisHubs.Workflows\OasisHubs.Workflows.csproj", "{E44EAD5A-3C0E-4A65-82C5-EEF86D8310E6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -50,6 +52,10 @@ Global
 		{261B8319-68E9-47E0-A252-CE14D3CF18A5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{261B8319-68E9-47E0-A252-CE14D3CF18A5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{261B8319-68E9-47E0-A252-CE14D3CF18A5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E44EAD5A-3C0E-4A65-82C5-EEF86D8310E6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E44EAD5A-3C0E-4A65-82C5-EEF86D8310E6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E44EAD5A-3C0E-4A65-82C5-EEF86D8310E6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E44EAD5A-3C0E-4A65-82C5-EEF86D8310E6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{AA330F60-FFF2-458A-AFA4-5AD3E36E7ACB} = {4C9F4D4E-C607-46D8-887C-6AA86593CE82}
@@ -58,5 +64,6 @@ Global
 		{0165D75E-C142-488A-A29D-E52A358382B6} = {4C9F4D4E-C607-46D8-887C-6AA86593CE82}
 		{CB4FB3CF-B1BA-4727-B52A-AE5CC4BB4F7F} = {4C9F4D4E-C607-46D8-887C-6AA86593CE82}
 		{261B8319-68E9-47E0-A252-CE14D3CF18A5} = {4C9F4D4E-C607-46D8-887C-6AA86593CE82}
+		{E44EAD5A-3C0E-4A65-82C5-EEF86D8310E6} = {4C9F4D4E-C607-46D8-887C-6AA86593CE82}
 	EndGlobalSection
 EndGlobal
