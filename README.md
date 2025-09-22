@@ -27,9 +27,9 @@ Connect Express accounts.
 
 ## [Container Dependencies](.compose/compose.yaml)
 
-* [MS SQL Server](https://github.com/microsoft/mssql-docker/tree/master) - Relational storage for
+* [Postgres](https://www.postgresql.org/) - Relational storage for
   user credentials, hubs, and bookings
-* [Rabbitmq](https://github.com/docker-library/rabbitmq) - Message broker for handling webhook
+* [Temporal](https://temporal.io/) - Message broker for handling webhook
   events
 * [Redis](https://redis.io/docs/install/install-stack/docker/) - Distributed cache
 
